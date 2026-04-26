@@ -25,27 +25,10 @@ export function LoginPage() {
     setError(null);
 
     try {
-      const form = document.createElement("form");
-      form.method = "POST";
-      form.action = `${API_BASE_URL}/api/auth/sign-in/social`;
-      form.style.display = "none";
-
-      const fields = {
-        provider: "google",
-        callbackURL: `${window.location.origin}/`,
-        errorCallbackURL: `${window.location.origin}/`,
-      };
-
-      for (const [name, value] of Object.entries(fields)) {
-        const input = document.createElement("input");
-        input.type = "hidden";
-        input.name = name;
-        input.value = value;
-        form.appendChild(input);
-      }
-
-      document.body.appendChild(form);
-      form.submit();
+      const url = new URL(`${API_BASE_URL}/auth/google/start`);
+      url.searchParams.set("callbackURL", `${window.location.origin}/`);
+      url.searchParams.set("errorCallbackURL", `${window.location.origin}/`);
+      window.location.href = url.toString();
     } catch {
       setError("Could not connect to the server. Please try again.");
       setLoading(false);

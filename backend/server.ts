@@ -22,6 +22,34 @@ Bun.serve({
   routes: {
     "/api/auth/*": authHandler,
 
+    "/auth/google/start": {
+      GET: async (req) => {
+        const url = new URL(req.url);
+        const callbackURL = url.searchParams.get("callbackURL");
+        const errorCallbackURL = url.searchParams.get("errorCallbackURL") ?? callbackURL;
+
+        if (!callbackURL) {
+          return json({ error: "callbackURL is required" }, 400);
+        }
+
+        const headers = new Headers(req.headers);
+        headers.set("Content-Type", "application/json");
+
+        const authURL = new URL("/api/auth/sign-in/social", req.url);
+        const authReq = new Request(authURL, {
+          method: "POST",
+          headers,
+          body: JSON.stringify({
+            provider: "google",
+            callbackURL,
+            errorCallbackURL,
+          }),
+        });
+
+        return authHandler(authReq);
+      },
+    },
+
     "/conversation": {
       OPTIONS: (req) => {
         const origin = getRequestOrigin(req);
