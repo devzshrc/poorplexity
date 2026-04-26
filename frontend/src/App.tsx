@@ -13,6 +13,7 @@ import { Separator }                           from '@/components/ui/separator'
 import { LoginPage }                           from '@/components/LoginPage'
 import { useAuth }                             from '@/providers/AuthProvider'
 import { signOut }                             from '@/lib/auth-client'
+import { API_BASE_URL }                        from '@/lib/config'
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
@@ -144,7 +145,7 @@ function SearchView() {
     setState('loading')
 
     try {
-      const res = await fetch('http://localhost:3598/conversation', {
+      const res = await fetch(`${API_BASE_URL}/conversation`, {
         method:      'POST',
         headers:     { 'Content-Type': 'application/json' },
         body:        JSON.stringify({ query: q }),

@@ -24,8 +24,14 @@ export const env = Object.fromEntries(
 ) as Record<EnvKey, string>;
 
 export const IS_PROD = process.env.NODE_ENV === "production";
+export const COOKIE_SAME_SITE = (
+  process.env.COOKIE_SAME_SITE ?? (IS_PROD ? "none" : "lax")
+) as "lax" | "strict" | "none";
 
 // Comma-separated list of allowed frontend origins
 export const ALLOWED_ORIGINS: string[] = (
   process.env.ALLOWED_ORIGINS ?? "http://localhost:5173"
-).split(",").map((o) => o.trim());
+)
+  .split(",")
+  .map((o) => o.trim().replace(/\/+$/, ""))
+  .filter(Boolean);

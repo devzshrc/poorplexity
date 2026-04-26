@@ -8,18 +8,19 @@ if (isRenderBuild) {
   process.exit(0);
 }
 
-const [{ authHandler, getSession }, { CORS_HEADERS, SSE_HEADERS, sseEvent }, { webSearch }, { buildPrompt, streamAnswer, getFollowUps }] =
+const [{ authHandler, getSession }, { SSE_HEADERS, sseEvent }, { corsHeaders, getRequestOrigin, isAllowedOrigin, mergeHeaders }, { webSearch }, { buildPrompt, streamAnswer, getFollowUps }] =
   await Promise.all([
     import("./src/auth/middleware"),
     import("./src/sse"),
+    import("./src/http"),
     import("./src/search"),
     import("./src/llm"),
   ]);
 
-function json(data: unknown, status = 200): Response {
+function json(data: unknown, status = 200, headers?: HeadersInit): Response {
   return new Response(JSON.stringify(data), {
     status,
-    headers: { ...CORS_HEADERS, "Content-Type": "application/json" },
+    headers: mergeHeaders(new Headers(headers), { "Content-Type": "application/json" }),
   });
 }
 
@@ -34,22 +35,39 @@ Bun.serve({
 
     // Conversation (protected)
     "/conversation": {
-      OPTIONS: () => new Response(null, { status: 204, headers: CORS_HEADERS }),
+      OPTIONS: (req) => {
+        const origin = getRequestOrigin(req);
+        const headers = corsHeaders(origin, { methods: ["POST", "OPTIONS"] });
+        if (origin && !isAllowedOrigin(origin)) {
+          return new Response(
+            JSON.stringify({ error: "Origin not allowed" }),
+            { status: 403, headers: mergeHeaders(headers, { "Content-Type": "application/json" }) }
+          );
+        }
+        return new Response(null, { status: 204, headers });
+      },
 
       POST: async (req) => {
+        const origin = getRequestOrigin(req);
+        const headers = corsHeaders(origin, { methods: ["POST", "OPTIONS"] });
+
+        if (origin && !isAllowedOrigin(origin)) {
+          return json({ error: "Origin not allowed" }, 403, headers);
+        }
+
         const session = await getSession(req);
-        if (!session) return json({ error: "Unauthorized" }, 401);
+        if (!session) return json({ error: "Unauthorized" }, 401, headers);
 
         let query: string;
         try {
           const body = (await req.json()) as { query?: unknown };
           query = typeof body.query === "string" ? body.query.trim() : "";
         } catch {
-          return json({ error: "Invalid request body" }, 400);
+          return json({ error: "Invalid request body" }, 400, headers);
         }
 
-        if (!query) return json({ error: "query is required" }, 400);
-        if (query.length > 500) return json({ error: "query too long" }, 400);
+        if (!query) return json({ error: "query is required" }, 400, headers);
+        if (query.length > 500) return json({ error: "query too long" }, 400, headers);
 
         const body = new ReadableStream({
           async start(controller) {
@@ -75,7 +93,7 @@ Bun.serve({
           },
         });
 
-        return new Response(body, { headers: SSE_HEADERS });
+        return new Response(body, { headers: mergeHeaders(headers, SSE_HEADERS) });
       },
     },
   },

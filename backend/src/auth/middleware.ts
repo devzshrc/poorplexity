@@ -1,25 +1,18 @@
 import { auth, type Session } from "./index";
-import { ALLOWED_ORIGINS } from "./env";
-
-// ── CORS ──────────────────────────────────────────────────────────────────────
-
-function corsHeaders(origin: string | null): Record<string, string> {
-  const allowed = origin && ALLOWED_ORIGINS.includes(origin) ? origin : ALLOWED_ORIGINS[0]!;
-  return {
-    "Access-Control-Allow-Origin":      allowed,
-    "Access-Control-Allow-Credentials": "true",
-    "Access-Control-Allow-Methods":     "GET, POST, OPTIONS",
-    "Access-Control-Allow-Headers":     "Content-Type, Cookie",
-    // Vary: Origin tells CDNs/proxies that the response varies by origin
-    "Vary":                             "Origin",
-  };
-}
+import { corsHeaders, getRequestOrigin, isAllowedOrigin, mergeHeaders } from "../http";
 
 // ── Auth handler (mounts at /api/auth/*) ─────────────────────────────────────
 
 export async function authHandler(req: Request): Promise<Response> {
-  const origin = req.headers.get("Origin");
-  const cors   = corsHeaders(origin);
+  const origin = getRequestOrigin(req);
+  const cors = corsHeaders(origin);
+
+  if (origin && !isAllowedOrigin(origin)) {
+    return new Response(
+      JSON.stringify({ error: "Origin not allowed" }),
+      { status: 403, headers: mergeHeaders(cors, { "Content-Type": "application/json" }) }
+    );
+  }
 
   if (req.method === "OPTIONS") {
     return new Response(null, { status: 204, headers: cors });
@@ -32,7 +25,7 @@ export async function authHandler(req: Request): Promise<Response> {
     console.error("[auth] unhandled error:", e);
     return new Response(
       JSON.stringify({ error: "Internal server error" }),
-      { status: 500, headers: { ...cors, "Content-Type": "application/json" } }
+      { status: 500, headers: mergeHeaders(cors, { "Content-Type": "application/json" }) }
     );
   }
 
@@ -45,7 +38,7 @@ export async function authHandler(req: Request): Promise<Response> {
   }
 
   const headers = new Headers(res.headers);
-  for (const [k, v] of Object.entries(cors)) headers.set(k, v);
+  cors.forEach((value, key) => headers.set(key, value));
   return new Response(res.body, { status: res.status, headers });
 }
 
