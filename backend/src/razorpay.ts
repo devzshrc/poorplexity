@@ -128,7 +128,7 @@ async function razorpayRequest<T>(path: string, init?: RequestInit): Promise<T> 
 
 function getPremiumPlanConfig() {
   return {
-    amount: getNumberEnv("RAZORPAY_PREMIUM_AMOUNT", 10000),
+    amount: getNumberEnv("RAZORPAY_PREMIUM_AMOUNT", 100),
     currency: optionalEnv("RAZORPAY_PREMIUM_CURRENCY") || "INR",
     interval: getNumberEnv("RAZORPAY_PREMIUM_INTERVAL", 1),
     period: (optionalEnv("RAZORPAY_PREMIUM_PERIOD") || "monthly").toLowerCase(),

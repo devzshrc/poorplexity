@@ -1674,8 +1674,8 @@ function Workspace({
           <div className="space-y-3 p-4">
             <div className="flex items-center justify-between gap-3">
               <div>
-                <div className="text-xs font-medium text-muted-foreground">Browse</div>
-                <div className="text-xs text-muted-foreground">Switch views and sort chats.</div>
+                <div className="text-[11px] font-medium uppercase tracking-[0.12em] text-muted-foreground/75">Browse</div>
+                <div className="text-[11px] text-muted-foreground/70">Switch views and sort chats.</div>
               </div>
               <Button variant={showFolderCreator ? 'secondary' : 'outline'} size="sm" onClick={() => setShowFolderCreator((current) => !current)}>
                 <FolderPlus className="mr-2 size-4" />
@@ -2119,7 +2119,7 @@ function Workspace({
                     <div className="grid gap-2 text-sm text-muted-foreground">
                       <div className="flex items-center justify-between pb-2">
                         <span>Price</span>
-                        <span>{moneyLabel(workspace?.user.billing.amountPaise ?? 10000, workspace?.user.billing.currency ?? 'INR') ?? 'Rs 100 / month'}</span>
+                        <span>{moneyLabel(workspace?.user.billing.amountPaise ?? 100, workspace?.user.billing.currency ?? 'INR') ?? 'Rs 1 / month'}</span>
                       </div>
                       <div className="flex items-center justify-between pb-2">
                         <span>Renews / access ends</span>
@@ -2349,7 +2349,7 @@ function Workspace({
                           <div>
                             <div className="text-sm font-medium">You’ve used today’s free messages.</div>
                             <div className="mt-1 text-xs text-muted-foreground">
-                              Upgrade to Premium for {moneyLabel(workspace?.user.billing.amountPaise ?? 10000, workspace?.user.billing.currency ?? 'INR') ?? 'Rs 100/month'} and get a higher daily limit.
+                              Upgrade to Premium for {moneyLabel(workspace?.user.billing.amountPaise ?? 100, workspace?.user.billing.currency ?? 'INR') ?? 'Rs 1/month'} and get a higher daily limit.
                             </div>
                           </div>
                           <div className="flex shrink-0 items-center gap-2">
