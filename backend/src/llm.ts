@@ -4,11 +4,24 @@ import type { SearchResult } from "./search";
 
 const groq = new Groq({ apiKey: process.env.GROQ_API_KEY });
 
-const ANSWER_MODEL   = "llama-3.3-70b-versatile";
-const FOLLOWUP_MODEL = "llama-3.1-8b-instant";
+const LIGHT_MODEL = "llama-3.1-8b-instant";
+const ANSWER_MODEL = LIGHT_MODEL;
+const FOLLOWUP_MODEL = LIGHT_MODEL;
 
-export function buildPrompt(query: string, results: SearchResult[]): string {
+export type ConversationTurn = {
+  role: "user" | "assistant";
+  content: string;
+};
+
+export function buildPrompt(
+  query: string,
+  results: SearchResult[],
+  history: ConversationTurn[] = [],
+  chatTitle?: string
+): string {
   return PROMPT_TEMPLATE
+    .replace("{{CHAT_TITLE}}", chatTitle?.trim() || "Untitled chat")
+    .replace("{{CONVERSATION_HISTORY}}", JSON.stringify(history))
     .replace("{{WEB_SEARCH_RESULTS}}", JSON.stringify(results))
     .replace("{{USER_QUERY}}", query);
 }
