@@ -1,7 +1,7 @@
 import { betterAuth } from "better-auth";
 import { Kysely, PostgresDialect } from "kysely";
 import { Pool } from "pg";
-import { env, IS_PROD, ALLOWED_ORIGINS, COOKIE_SAME_SITE } from "./env";
+import { env, IS_PROD, ALLOWED_ORIGINS, COOKIE_SAME_SITE, USE_SECURE_COOKIES } from "./env";
 
 const pool = new Pool({
   connectionString: env.DATABASE_URL,
@@ -37,11 +37,11 @@ export const auth = betterAuth({
   // ── Cookie security ───────────────────────────────────────────────────────
   advanced: {
     cookiePrefix: "pp",             // "pp.session" etc.
-    useSecureCookies: IS_PROD,      // Secure flag only in production (requires HTTPS)
+    useSecureCookies: USE_SECURE_COOKIES,
     defaultCookieAttributes: {
       httpOnly: true,               // JS cannot access session cookies
       sameSite: COOKIE_SAME_SITE,
-      secure:   IS_PROD,
+      secure:   USE_SECURE_COOKIES,
     },
   },
 

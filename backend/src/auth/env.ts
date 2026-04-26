@@ -23,10 +23,16 @@ export const env = Object.fromEntries(
   REQUIRED.map((k) => [k, process.env[k]!])
 ) as Record<EnvKey, string>;
 
-export const IS_PROD = process.env.NODE_ENV === "production";
+export const IS_PROD =
+  process.env.NODE_ENV === "production" ||
+  env.BETTER_AUTH_URL.startsWith("https://");
 export const COOKIE_SAME_SITE = (
   process.env.COOKIE_SAME_SITE ?? (IS_PROD ? "none" : "lax")
 ) as "lax" | "strict" | "none";
+export const USE_SECURE_COOKIES =
+  process.env.USE_SECURE_COOKIES === "true" ||
+  env.BETTER_AUTH_URL.startsWith("https://") ||
+  COOKIE_SAME_SITE === "none";
 
 // Comma-separated list of allowed frontend origins
 export const ALLOWED_ORIGINS: string[] = (
