@@ -4,8 +4,8 @@
   "type": "module",
   "private": true,
   "scripts": {
-    "build": "bun build ./index.ts --target bun --outdir ./dist",
-    "start": "bun ./dist/index.js",
+    "build": "bun build ./server.ts --target bun --outfile ./dist/server.js",
+    "start": "bun ./dist/server.js",
     "migrate": "bun migrate.ts"
   },
   "devDependencies": {
