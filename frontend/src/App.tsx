@@ -22,6 +22,7 @@ import {
   MessageSquare,
   Moon,
   MoreHorizontal,
+  PanelLeft,
   Pencil,
   Pin,
   Plus,
@@ -450,8 +451,8 @@ function MessageSources({ sources }: { sources: Source[] }) {
 
 function WorkspaceSkeleton() {
   return (
-    <div className="h-dvh overflow-hidden bg-background p-4 sm:p-6">
-      <div className="grid h-full min-h-0 gap-4 lg:grid-cols-[320px_minmax(0,1fr)]">
+    <div className="h-dvh overflow-hidden bg-background p-3 sm:p-6">
+      <div className="grid h-full min-h-0 gap-3 sm:gap-4 lg:grid-cols-[320px_minmax(0,1fr)]">
         <div className="rounded-3xl bg-card/70 p-4 shadow-sm">
           <Skeleton className="h-10 w-full" />
           <Skeleton className="mt-4 h-8 w-24" />
@@ -658,6 +659,7 @@ function PublicWorkspace({
   const clerk = useClerk()
   const [composer, setComposer] = useState('')
   const [showAuth, setShowAuth] = useState(false)
+  const [showSidebar, setShowSidebar] = useState(false)
   const [examples] = useState([
     'Compare the latest M4 MacBook Air with comparable Windows ultrabooks.',
     'Explain bun vs node for production APIs with tradeoffs.',
@@ -673,8 +675,40 @@ function PublicWorkspace({
 
   return (
     <div className="relative h-dvh overflow-hidden bg-background p-4 sm:p-6">
-      <div className="grid h-full min-h-0 gap-4 lg:grid-cols-[320px_minmax(0,1fr)]">
-        <aside className="flex min-h-0 flex-col rounded-3xl bg-card/75 shadow-sm backdrop-blur-sm">
+      <div className="mb-3 flex items-center justify-between gap-3 lg:hidden">
+        <div>
+          <div className="text-base font-semibold tracking-tight">poorplexity</div>
+          <div className="text-[11px] text-muted-foreground">Public workspace preview</div>
+        </div>
+        <div className="flex items-center gap-2">
+          <ThemeToggle theme={theme} onToggle={onToggleTheme} />
+          <Button variant="outline" size="icon-sm" title="Open navigation" onClick={() => setShowSidebar(true)}>
+            <PanelLeft className="size-4" />
+          </Button>
+        </div>
+      </div>
+
+      <AnimatePresence>
+        {showSidebar ? (
+          <motion.button
+            type="button"
+            aria-label="Close navigation"
+            className="absolute inset-0 z-30 bg-background/60 lg:hidden"
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            exit={{ opacity: 0 }}
+            onClick={() => setShowSidebar(false)}
+          />
+        ) : null}
+      </AnimatePresence>
+
+      <div className="grid h-full min-h-0 gap-3 lg:gap-4 lg:grid-cols-[320px_minmax(0,1fr)]">
+        <aside
+          className={joinClasses(
+            'fixed inset-y-4 left-4 z-40 flex w-[min(88vw,340px)] min-h-0 flex-col rounded-3xl bg-card/92 shadow-lg backdrop-blur-sm transition-transform duration-200 lg:static lg:w-auto lg:translate-x-0 lg:bg-card/75 lg:shadow-sm',
+            showSidebar ? 'translate-x-0' : '-translate-x-[120%]',
+          )}
+        >
           <div className="flex items-center justify-between px-4 py-4">
             <div>
               <h1 className="text-lg font-semibold tracking-tight">poorplexity</h1>
@@ -695,7 +729,10 @@ function PublicWorkspace({
                     whileHover={{ y: -1 }}
                     whileTap={{ scale: 0.995 }}
                     key={item}
-                    onClick={() => setComposer(item)}
+                    onClick={() => {
+                      setComposer(item)
+                      setShowSidebar(false)
+                    }}
                     className="premium-surface w-full border border-border px-3 py-2 text-left text-xs transition-colors hover:bg-muted"
                   >
                     {item}
@@ -707,27 +744,27 @@ function PublicWorkspace({
         </aside>
 
         <main className="flex min-h-0 flex-col rounded-3xl bg-card/75 shadow-sm backdrop-blur-sm">
-          <div className="px-5 py-4">
-            <div className="flex items-center justify-between gap-3">
-              <div>
-                <h2 className="text-xl font-semibold tracking-tight">Ask first. Sign in when it matters.</h2>
-                <p className="mt-1 text-sm text-muted-foreground">
+          <div className="px-4 py-3 sm:px-5 sm:py-4">
+            <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
+              <div className="min-w-0">
+                <h2 className="text-lg font-semibold tracking-tight sm:text-xl">Ask first. Sign in when it matters.</h2>
+                <p className="mt-1 max-w-2xl text-xs text-muted-foreground sm:text-sm">
                   You can explore the workspace before login. Sending a message opens the minimal auth prompt.
                 </p>
               </div>
-              <div className="flex items-center gap-2">
-                <Button className="h-10" variant="outline" onClick={() => clerk.redirectToSignIn({ signInFallbackRedirectUrl: redirectUrl })}>
+              <div className="flex flex-col gap-2 sm:flex-row sm:items-center">
+                <Button className="h-10 sm:min-w-28" variant="outline" onClick={() => clerk.redirectToSignIn({ signInFallbackRedirectUrl: redirectUrl })}>
                   Sign in
                 </Button>
-                <Button className="h-10" onClick={() => clerk.redirectToSignUp({ signUpFallbackRedirectUrl: redirectUrl })}>
+                <Button className="h-10 sm:min-w-36" onClick={() => clerk.redirectToSignUp({ signUpFallbackRedirectUrl: redirectUrl })}>
                   Create account
                 </Button>
               </div>
             </div>
           </div>
 
-          <div className="min-h-0 flex-1 overflow-y-auto px-5 py-5">
-            <motion.div variants={subtleList} initial={false} animate="animate" className="mx-auto flex max-w-4xl flex-col gap-5">
+          <div className="min-h-0 flex-1 overflow-y-auto px-4 py-3 sm:px-5 sm:py-5">
+            <motion.div variants={subtleList} initial={false} animate="animate" className="mx-auto flex max-w-4xl flex-col gap-4 sm:gap-5">
               <motion.div {...fadeUp}>
               <Card className="premium-surface shadow-none">
                 <CardHeader>
@@ -750,7 +787,7 @@ function PublicWorkspace({
               </Card>
               </motion.div>
 
-              <motion.section {...fadeUp} className="premium-surface rounded-3xl bg-background/70 px-4 py-4">
+              <motion.section {...fadeUp} className="premium-surface rounded-3xl bg-background/70 px-4 py-4 sm:px-5">
                 <div className="mb-3 flex items-center gap-2">
                   <Badge variant="secondary">Assistant</Badge>
                   <span className="text-xs text-muted-foreground">Preview</span>
@@ -764,7 +801,7 @@ function PublicWorkspace({
             </motion.div>
           </div>
 
-          <div className="px-5 py-4">
+          <div className="mobile-composer sticky bottom-0 z-20 mt-auto border-t border-border/50 bg-card/90 px-4 py-3 backdrop-blur-xl sm:px-5 sm:py-4">
             <div className="mx-auto max-w-4xl">
               <Textarea
                 value={composer}
@@ -776,11 +813,11 @@ function PublicWorkspace({
                   }
                 }}
                 placeholder="Write your question. Send will ask you to sign in."
-                className="min-h-28"
+                className="min-h-18 max-h-32 sm:min-h-28"
               />
-              <div className="mt-3 flex items-center justify-between gap-3">
-                <p className="text-xs text-muted-foreground">Your draft will be preserved through sign-in.</p>
-                <Button disabled={!composer.trim()} onClick={openAuth}>
+              <div className="mt-3 flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
+                <p className="text-[11px] text-muted-foreground sm:text-xs">Your draft will be preserved through sign-in.</p>
+                <Button className="h-11 w-full sm:w-auto" disabled={!composer.trim()} onClick={openAuth}>
                   <Send className="mr-2 size-4" />
                   Send
                 </Button>
@@ -866,6 +903,7 @@ function Workspace({
   const [isCancellingSubscription, setIsCancellingSubscription] = useState(false)
   const [showUpgradePrompt, setShowUpgradePrompt] = useState(false)
   const [showToolsMenu, setShowToolsMenu] = useState(false)
+  const [showSidebar, setShowSidebar] = useState(false)
   const abortRef = useRef<AbortController | null>(null)
   const messagesEndRef = useRef<HTMLDivElement | null>(null)
 
@@ -1530,7 +1568,10 @@ function Workspace({
             <button
               type="button"
               className="flex min-w-0 flex-1 items-center gap-3 text-left"
-              onClick={() => setActiveFilter(folder.id)}
+              onClick={() => {
+                setActiveFilter(folder.id)
+                setShowSidebar(false)
+              }}
               title={folder.name}
             >
               <Folder className="size-4 shrink-0 text-muted-foreground" />
@@ -1619,9 +1660,43 @@ function Workspace({
   }
 
   return (
-    <div className="h-dvh overflow-hidden bg-background p-4 sm:p-6">
-      <div className="grid h-full min-h-0 gap-4 lg:grid-cols-[320px_minmax(0,1fr)]">
-        <aside className="flex min-h-0 flex-col rounded-3xl bg-card/75 shadow-sm backdrop-blur-sm">
+    <div className="h-dvh overflow-hidden bg-background p-3 sm:p-6">
+      <div className="mb-3 flex items-center justify-between gap-3 lg:hidden">
+        <div className="min-w-0">
+          <div className="truncate text-base font-semibold tracking-tight">poorplexity</div>
+          <div className="text-[11px] text-muted-foreground">
+            {mainView === 'settings' ? 'Settings' : selectedChat ? selectedChat.title : 'Research workspace'}
+          </div>
+        </div>
+        <div className="flex items-center gap-2">
+          <ThemeToggle theme={theme} onToggle={onToggleTheme} />
+          <Button variant="outline" size="icon-sm" title="Open navigation" onClick={() => setShowSidebar(true)}>
+            <PanelLeft className="size-4" />
+          </Button>
+        </div>
+      </div>
+
+      <AnimatePresence>
+        {showSidebar ? (
+          <motion.button
+            type="button"
+            aria-label="Close navigation"
+            className="absolute inset-0 z-30 bg-background/60 lg:hidden"
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            exit={{ opacity: 0 }}
+            onClick={() => setShowSidebar(false)}
+          />
+        ) : null}
+      </AnimatePresence>
+
+      <div className="grid h-full min-h-0 gap-3 sm:gap-4 lg:grid-cols-[320px_minmax(0,1fr)]">
+        <aside
+          className={joinClasses(
+            'fixed inset-y-4 left-4 z-40 flex w-[min(88vw,340px)] min-h-0 flex-col rounded-3xl bg-card/92 shadow-lg backdrop-blur-sm transition-transform duration-200 lg:static lg:w-auto lg:translate-x-0 lg:bg-card/75 lg:shadow-sm',
+            showSidebar ? 'translate-x-0' : '-translate-x-[120%]',
+          )}
+        >
           <div className="flex items-center justify-between px-4 py-4">
             <div>
               <h1 className="text-lg font-semibold tracking-tight">poorplexity</h1>
@@ -1647,7 +1722,10 @@ function Workspace({
                 size="icon-sm"
                 className="h-10 w-10 shrink-0"
                 title="Settings"
-                onClick={() => setMainView('settings')}
+                onClick={() => {
+                  setMainView('settings')
+                  setShowSidebar(false)
+                }}
               >
                 <Settings className="size-4" />
               </Button>
@@ -1699,7 +1777,16 @@ function Workspace({
               <div className="text-xs font-medium text-muted-foreground">View</div>
               <div className="flex flex-wrap gap-2">
                 {(['all', 'unfiled', 'archived', 'trash'] as FilterValue[]).map((filter) => (
-                  <Button key={filter} variant={activeFilter === filter ? 'secondary' : 'ghost'} size="sm" onClick={() => setActiveFilter(filter)} title={`Show ${filter} chats`}>
+                  <Button
+                    key={filter}
+                    variant={activeFilter === filter ? 'secondary' : 'ghost'}
+                    size="sm"
+                    onClick={() => {
+                      setActiveFilter(filter)
+                      setShowSidebar(false)
+                    }}
+                    title={`Show ${filter} chats`}
+                  >
                     {filter === 'all' ? 'All' : filter === 'unfiled' ? 'Unfiled' : filter === 'archived' ? 'Archived' : `Trash (${workspace?.usage.deletedRecoverableCount ?? 0})`}
                   </Button>
                 ))}
@@ -1727,7 +1814,7 @@ function Workspace({
                     <motion.button
                       variants={fadeUp}
                       key={chat.id}
-                      onClick={() => { setSelectedChatId(chat.id); setMainView('chat') }}
+                      onClick={() => { setSelectedChatId(chat.id); setMainView('chat'); setShowSidebar(false) }}
                       className={joinClasses('premium-surface w-full rounded-2xl bg-background/70 px-3 py-2 text-left transition-colors hover:-translate-y-px hover:bg-muted', selectedChatId === chat.id && 'bg-muted')}
                     >
                       <div className="truncate text-sm font-medium">{chat.title}</div>
@@ -1743,7 +1830,7 @@ function Workspace({
                     <motion.button
                       variants={fadeUp}
                       key={`${message.chatId}-${message.id}`}
-                      onClick={() => { setSelectedChatId(message.chatId); setMainView('chat') }}
+                      onClick={() => { setSelectedChatId(message.chatId); setMainView('chat'); setShowSidebar(false) }}
                       className="premium-surface w-full rounded-2xl bg-background/70 px-3 py-2 text-left transition-colors hover:-translate-y-px hover:bg-muted"
                     >
                       <div className="text-xs font-medium">{message.chatTitle}</div>
@@ -1765,7 +1852,7 @@ function Workspace({
                       <button
                         draggable={activeFilter !== 'trash'}
                         onDragStart={(event: DragEvent<HTMLButtonElement>) => event.dataTransfer.setData('text/plain', chat.id)}
-                        onClick={() => { setSelectedChatId(chat.id); setMainView('chat') }}
+                        onClick={() => { setSelectedChatId(chat.id); setMainView('chat'); setShowSidebar(false) }}
                         className={joinClasses('premium-surface w-full rounded-2xl bg-background/70 px-3 py-2 text-left transition-colors hover:-translate-y-px hover:bg-muted', selectedChatId === chat.id && 'bg-muted')}
                       >
                         <div className="flex items-start gap-2">
@@ -1789,22 +1876,22 @@ function Workspace({
         </aside>
 
         <main className="flex min-h-0 flex-col rounded-3xl bg-card/75 shadow-sm backdrop-blur-sm">
-          <div className="flex items-center justify-between gap-4 px-5 py-4">
+          <div className="flex flex-col gap-3 px-4 py-3 sm:px-5 sm:py-4 lg:flex-row lg:items-center lg:justify-between">
             <div className="min-w-0">
               {selectedChat ? (
                 editingTitle ? (
-                  <div className="flex gap-2">
-                    <Input value={draftTitle} onChange={(event) => setDraftTitle(event.target.value)} className="w-[280px]" />
+                  <div className="flex flex-col gap-2 sm:flex-row">
+                    <Input value={draftTitle} onChange={(event) => setDraftTitle(event.target.value)} className="w-full sm:w-[280px]" />
                     <Button className="h-9 w-9 shrink-0" size="icon-sm" title="Save title" onClick={() => authorizedFetch(`/api/chats/${selectedChat.id}`, { method: 'PATCH', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ title: draftTitle }) }).then(() => loadWorkspace()).then(() => loadChat(selectedChat.id)).then(() => setEditingTitle(false)).catch((error: Error) => setErrorMessage(error.message))}><Check className="size-4" /></Button>
                   </div>
                 ) : (
                   <>
-                    <div className="flex items-center gap-2">
-                      <h2 className="truncate text-xl font-semibold tracking-tight">{selectedChat.title}</h2>
+                    <div className="flex flex-wrap items-center gap-2">
+                      <h2 className="min-w-0 truncate text-base font-semibold tracking-tight sm:text-lg lg:text-xl">{selectedChat.title}</h2>
                       {selectedChat.isPinned ? <Badge variant="outline">Pinned</Badge> : null}
                       {selectedChat.isArchived ? <Badge variant="outline">Archived</Badge> : null}
                     </div>
-                    <div className="mt-1 flex flex-wrap items-center gap-2 text-xs text-muted-foreground">
+                    <div className="mt-1 flex flex-wrap items-center gap-2 text-[11px] text-muted-foreground sm:text-xs">
                       <span>{selectedChat.messageCount} messages</span>
                       <span>•</span>
                       <span>Updated {timeLabel(selectedChat.updatedAt)}</span>
@@ -1821,7 +1908,7 @@ function Workspace({
             </div>
 
             {selectedChat ? (
-              <div className="relative flex flex-wrap items-center gap-1">
+              <div className="relative flex flex-wrap items-center gap-1 sm:justify-end">
                 {!showChatSettingsPanel ? (
                   <Button
                     variant="ghost"
@@ -1947,7 +2034,7 @@ function Workspace({
           ) : null}
 
           {mainView === 'settings' ? (
-            <div className="min-h-0 flex-1 overflow-y-auto px-5 py-5">
+            <div className="min-h-0 flex-1 overflow-y-auto px-4 py-3 sm:px-5 sm:py-5">
               <div className="mx-auto max-w-5xl space-y-5">
                 <Card className="shadow-none">
                   <CardHeader>
@@ -2166,7 +2253,7 @@ function Workspace({
           ) : selectedChat ? (
             <>
               <div className="min-h-0 flex-1 overflow-y-auto">
-                <div className="mx-auto flex max-w-5xl flex-col gap-5 px-5 py-5">
+                <div className="mx-auto flex max-w-5xl flex-col gap-4 px-4 py-3 sm:gap-5 sm:px-5 sm:py-5">
                   {showChatSettingsPanel ? (
                     <Card className="shadow-none">
                       <CardHeader>
@@ -2258,7 +2345,21 @@ function Workspace({
                     </Card>
                   ) : null}
 
-                  <motion.div variants={subtleList} initial={false} animate="animate" className="flex flex-col gap-5">
+                  <motion.div variants={subtleList} initial={false} animate="animate" className="flex flex-col gap-4 sm:gap-5">
+                    {!selectedChat.messages.length ? (
+                      <motion.div
+                        {...fadeUp}
+                        className="rounded-3xl bg-background/55 px-4 py-6 text-center sm:px-6"
+                      >
+                        <div className="mx-auto mb-3 flex size-10 items-center justify-center rounded-2xl bg-muted">
+                          <MessageSquare className="size-4" />
+                        </div>
+                        <div className="text-sm font-medium">No messages yet</div>
+                        <p className="mt-1 text-xs leading-6 text-muted-foreground sm:text-sm">
+                          Ask the first question below. The answer will show up here with sources, follow-ups, and saved context.
+                        </p>
+                      </motion.div>
+                    ) : null}
                     {selectedChat.messages.map((message, index) => (
                       <motion.section
                         key={message.id}
@@ -2340,7 +2441,7 @@ function Workspace({
                 </div>
               </div>
 
-              <div className="px-5 py-4">
+              <div className="mobile-composer sticky bottom-0 z-20 mt-auto border-t border-border/50 bg-card/90 px-4 py-3 backdrop-blur-xl sm:px-5 sm:py-4">
                 <div className="mx-auto max-w-5xl">
                   <AnimatePresence>
                     {showUpgradePrompt ? (
@@ -2384,10 +2485,10 @@ function Workspace({
                       }
                     }}
                     placeholder={editingMessageId ? 'Update that earlier message and resend.' : 'Ask a follow-up. Shift+Enter for a new line.'}
-                    className="min-h-28"
+                    className="min-h-16 max-h-36 sm:min-h-28"
                   />
-                  <div className="mt-3 flex flex-wrap items-center justify-between gap-3">
-                    <div className="flex flex-wrap items-center gap-3 text-xs text-muted-foreground">
+                  <div className="mt-3 flex flex-col gap-2 sm:flex-row sm:flex-wrap sm:items-center sm:justify-between">
+                    <div className="flex flex-col gap-2 text-[11px] text-muted-foreground sm:flex-row sm:flex-wrap sm:items-center sm:gap-3 sm:text-xs">
                       <label className="flex items-center gap-2">
                         <input type="checkbox" checked={composerUseWebSearch} onChange={(event) => setComposerUseWebSearch(event.target.checked)} />
                         <Globe className="size-3.5" />
@@ -2399,9 +2500,10 @@ function Workspace({
                           : `${workspace?.usage.remainingToday ?? 0} messages left today`}
                       </span>
                     </div>
-                    <div className="flex items-center gap-2">
-                      {editingMessageId ? <Button variant="ghost" onClick={() => { setEditingMessageId(null); setComposer('') }}>Cancel</Button> : null}
+                    <div className="flex w-full items-center gap-2 sm:w-auto">
+                      {editingMessageId ? <Button className="h-11" variant="ghost" onClick={() => { setEditingMessageId(null); setComposer('') }}>Cancel</Button> : null}
                       <Button
+                        className="h-11 flex-1 sm:flex-none"
                         disabled={isSending || !composer.trim()}
                         onClick={() => (
                           workspace?.usage.remainingToday === 0 && !workspace?.user.billing.isPremium

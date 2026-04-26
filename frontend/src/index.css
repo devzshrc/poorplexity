@@ -251,6 +251,10 @@
   scroll-behavior: smooth;
 }
 
+.mobile-composer {
+  padding-bottom: calc(0.75rem + env(safe-area-inset-bottom, 0px));
+}
+
 .streaming-caret::after {
   content: "";
   display: inline-block;
