@@ -1,6 +1,5 @@
-const [{ authHandler, getSession }, { SSE_HEADERS, sseEvent }, { corsHeaders, getRequestOrigin, isAllowedOrigin, mergeHeaders }, { webSearch }, { buildPrompt, streamAnswer, getFollowUps }] =
+const [{ SSE_HEADERS, sseEvent }, { corsHeaders, getRequestOrigin, isAllowedOrigin, mergeHeaders }, { webSearch }, { buildPrompt, streamAnswer, getFollowUps }] =
   await Promise.all([
-    import("./src/auth/middleware"),
     import("./src/sse"),
     import("./src/http"),
     import("./src/search"),
@@ -20,62 +19,6 @@ Bun.serve({
   port,
 
   routes: {
-    "/api/auth/*": authHandler,
-
-    "/auth/google/start": {
-      GET: async (req) => {
-        const url = new URL(req.url);
-        const callbackURL = url.searchParams.get("callbackURL");
-        const errorCallbackURL = url.searchParams.get("errorCallbackURL") ?? callbackURL;
-
-        if (!callbackURL) {
-          return json({ error: "callbackURL is required" }, 400);
-        }
-
-        const headers = new Headers(req.headers);
-        headers.set("Content-Type", "application/json");
-
-        const authURL = new URL("/api/auth/sign-in/social", req.url);
-        const authReq = new Request(authURL, {
-          method: "POST",
-          headers,
-          body: JSON.stringify({
-            provider: "google",
-            callbackURL,
-            errorCallbackURL,
-          }),
-        });
-
-        const authRes = await authHandler(authReq);
-        const location = authRes.headers.get("Location");
-
-        if (location) {
-          const redirectHeaders = new Headers(authRes.headers);
-          redirectHeaders.set("Location", location);
-          return new Response(null, {
-            status: authRes.status >= 300 && authRes.status < 400 ? authRes.status : 302,
-            headers: redirectHeaders,
-          });
-        }
-
-        try {
-          const data = await authRes.clone().json() as { url?: string; redirect?: boolean };
-          if (data.redirect && data.url) {
-            const redirectHeaders = new Headers(authRes.headers);
-            redirectHeaders.set("Location", data.url);
-            return new Response(null, {
-              status: 302,
-              headers: redirectHeaders,
-            });
-          }
-        } catch {
-          // Fall through to the original response when the body is not JSON.
-        }
-
-        return authRes;
-      },
-    },
-
     "/conversation": {
       OPTIONS: (req) => {
         const origin = getRequestOrigin(req);
@@ -96,9 +39,6 @@ Bun.serve({
         if (origin && !isAllowedOrigin(origin)) {
           return json({ error: "Origin not allowed" }, 403, headers);
         }
-
-        const session = await getSession(req);
-        if (!session) return json({ error: "Unauthorized" }, 401, headers);
 
         let query: string;
         try {

@@ -1,7 +1,7 @@
 import { useState, useRef } from 'react'
 import ReactMarkdown from 'react-markdown'
 import remarkGfm from 'remark-gfm'
-import { AlertCircle, ArrowRight, ArrowUpRight, Loader2, LogOut } from 'lucide-react'
+import { AlertCircle, ArrowRight, ArrowUpRight, Loader2 } from 'lucide-react'
 
 import { Button }                              from '@/components/ui/button'
 import { Input }                               from '@/components/ui/input'
@@ -10,9 +10,6 @@ import { Card, CardHeader, CardTitle,
 import { Skeleton }                            from '@/components/ui/skeleton'
 import { Alert, AlertTitle, AlertDescription } from '@/components/ui/alert'
 import { Separator }                           from '@/components/ui/separator'
-import { LoginPage }                           from '@/components/LoginPage'
-import { useAuth }                             from '@/providers/AuthProvider'
-import { signOut }                             from '@/lib/auth-client'
 import { API_BASE_URL }                        from '@/lib/config'
 
 // ─── Types ────────────────────────────────────────────────────────────────────
@@ -121,8 +118,6 @@ function AnswerSkeleton() {
 // ─── Main search view ─────────────────────────────────────────────────────────
 
 function SearchView() {
-  const { session } = useAuth()
-
   const [query,     setQuery]     = useState('')
   const [state,     setState]     = useState<AppState>('idle')
   const [answer,    setAnswer]    = useState('')
@@ -150,14 +145,7 @@ function SearchView() {
         headers:     { 'Content-Type': 'application/json' },
         body:        JSON.stringify({ query: q }),
         signal:      ctrl.signal,
-        credentials: 'include',
       })
-
-      if (res.status === 401) {
-        // Session expired — reload to trigger auth gate
-        window.location.reload()
-        return
-      }
 
       if (!res.ok) {
         const err = await res.json().catch(() => ({ error: `HTTP ${res.status}` }))
@@ -238,26 +226,7 @@ function SearchView() {
       {/* Top bar */}
       <div className="border-b bg-background sticky top-0 z-10">
         <div className="max-w-2xl mx-auto px-6 py-4 flex flex-col gap-3">
-          <div className="flex items-center justify-between">
-            <h1 className="text-lg font-bold tracking-tight">poorplexity</h1>
-            <div className="flex items-center gap-2">
-              {session?.user.image && (
-                <img src={session.user.image} alt="" className="size-6 rounded-full" />
-              )}
-              <span className="text-xs text-muted-foreground hidden sm:block">
-                {session?.user.name}
-              </span>
-              <Button
-                variant="ghost"
-                size="icon"
-                className="size-7"
-                onClick={() => signOut()}
-                title="Sign out"
-              >
-                <LogOut className="size-3.5" />
-              </Button>
-            </div>
-          </div>
+          <h1 className="text-lg font-bold tracking-tight">poorplexity</h1>
           {SearchBar}
         </div>
       </div>
@@ -361,17 +330,5 @@ function SearchView() {
 // ─── App ──────────────────────────────────────────────────────────────────────
 
 export default function App() {
-  const { session, isPending } = useAuth()
-
-  if (isPending) {
-    return (
-      <div className="min-h-screen flex items-center justify-center">
-        <Loader2 className="size-5 animate-spin text-muted-foreground" />
-      </div>
-    )
-  }
-
-  if (!session) return <LoginPage />
-
   return <SearchView />
 }

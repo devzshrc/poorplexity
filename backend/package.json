@@ -5,12 +5,10 @@
   "private": true,
   "scripts": {
     "build": "bun build ./server.ts --target bun --outfile ./dist/server.js",
-    "start": "bun ./dist/server.js",
-    "migrate": "bun migrate.ts"
+    "start": "bun ./dist/server.js"
   },
   "devDependencies": {
-    "@types/bun": "latest",
-    "@types/pg": "^8.20.0"
+    "@types/bun": "latest"
   },
   "peerDependencies": {
     "typescript": "^5"
@@ -19,11 +17,8 @@
     "@google/genai": "^1.50.1",
     "@tavily/core": "^0.7.2",
     "@types/express": "^5.0.6",
-    "better-auth": "^1.6.9",
     "dotenv": "^17.4.2",
     "express": "^5.2.1",
-    "groq-sdk": "^1.1.2",
-    "pg": "^8.20.0",
-    "postgres": "^3.4.9"
+    "groq-sdk": "^1.1.2"
   }
 }

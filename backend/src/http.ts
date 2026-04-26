@@ -1,9 +1,13 @@
-import { ALLOWED_ORIGINS } from "./auth/env";
+const ALLOWED_ORIGINS: string[] = (
+  process.env.ALLOWED_ORIGINS ?? "http://localhost:5173"
+)
+  .split(",")
+  .map((o) => o.trim().replace(/\/+$/, ""))
+  .filter(Boolean);
 
 const DEFAULT_ALLOWED_HEADERS = [
   "Content-Type",
   "Authorization",
-  "Cookie",
   "Accept",
   "Origin",
   "X-Requested-With",
@@ -33,7 +37,6 @@ export function corsHeaders(
     "Vary": "Origin",
     "Access-Control-Allow-Methods": (options?.methods ?? ["GET", "POST", "OPTIONS"]).join(", "),
     "Access-Control-Allow-Headers": (options?.headers ?? DEFAULT_ALLOWED_HEADERS).join(", "),
-    "Access-Control-Allow-Credentials": "true",
   });
 
   if (isAllowedOrigin(origin)) {
