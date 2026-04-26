@@ -97,7 +97,9 @@
   body {
     @apply bg-background text-foreground font-sans;
     -webkit-font-smoothing: antialiased;
-    overflow: hidden;
+    overflow-x: hidden;
+    overflow-y: auto;
+    overscroll-behavior-y: auto;
   }
 
   button,
@@ -113,6 +115,12 @@
       opacity 160ms cubic-bezier(0.22, 1, 0.36, 1),
       transform 160ms cubic-bezier(0.22, 1, 0.36, 1),
       box-shadow 160ms cubic-bezier(0.22, 1, 0.36, 1);
+  }
+}
+
+@media (min-width: 1024px) {
+  body {
+    overflow: hidden;
   }
 }
 

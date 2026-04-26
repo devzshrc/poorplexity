@@ -435,8 +435,8 @@ function MessageSources({ sources }: { sources: Source[] }) {
 
 function WorkspaceSkeleton() {
   return (
-    <div className="h-dvh overflow-hidden bg-background p-3 sm:p-6">
-      <div className="grid h-full min-h-0 gap-3 sm:gap-4 lg:grid-cols-[320px_minmax(0,1fr)]">
+    <div className="min-h-dvh overflow-x-hidden bg-background p-3 sm:p-6 lg:h-dvh lg:overflow-hidden">
+      <div className="grid gap-3 sm:gap-4 lg:h-full lg:min-h-0 lg:grid-cols-[320px_minmax(0,1fr)]">
         <div className="rounded-3xl bg-card/70 p-4 shadow-sm">
           <Skeleton className="h-10 w-full" />
           <Skeleton className="mt-4 h-8 w-24" />
@@ -706,7 +706,7 @@ function PublicWorkspace({
   }
 
   return (
-    <div className="relative h-dvh overflow-hidden bg-background p-4 sm:p-6">
+    <div className="relative min-h-dvh overflow-x-hidden bg-background p-4 sm:p-6 lg:h-dvh lg:overflow-hidden">
       <div className="mb-3 flex items-center justify-between gap-3 lg:hidden">
         <div>
           <div className="text-base font-semibold tracking-tight">poorplexity</div>
@@ -734,7 +734,7 @@ function PublicWorkspace({
         ) : null}
       </AnimatePresence>
 
-      <div className="grid h-full min-h-0 gap-3 lg:gap-4 lg:grid-cols-[320px_minmax(0,1fr)]">
+      <div className="grid gap-3 lg:gap-4 lg:h-full lg:min-h-0 lg:grid-cols-[320px_minmax(0,1fr)]">
         <aside
           className={joinClasses(
             'fixed inset-y-4 left-4 z-40 flex w-[min(88vw,340px)] min-h-0 flex-col rounded-3xl bg-card/92 shadow-lg backdrop-blur-sm transition-transform duration-200 lg:static lg:w-auto lg:translate-x-0 lg:bg-card/75 lg:shadow-sm',
@@ -795,7 +795,7 @@ function PublicWorkspace({
             </div>
           </div>
 
-          <div className="min-h-0 flex-1 overflow-y-auto px-4 py-3 sm:px-5 sm:py-5">
+          <div className="flex-1 overflow-visible px-4 py-3 sm:px-5 sm:py-5 lg:min-h-0 lg:overflow-y-auto">
             <motion.div variants={subtleList} initial={false} animate="animate" className="mx-auto flex max-w-4xl flex-col gap-4 sm:gap-5">
               <motion.div {...fadeUp}>
               <Card className="premium-surface shadow-none">
@@ -1671,7 +1671,7 @@ function Workspace({
   }
 
   return (
-    <div className="h-dvh overflow-hidden bg-background p-3 sm:p-6">
+    <div className="min-h-dvh overflow-x-hidden bg-background p-3 sm:p-6 lg:h-dvh lg:overflow-hidden">
       <div className="mb-3 flex items-center justify-between gap-3 lg:hidden">
         <div className="min-w-0">
           <div className="truncate text-base font-semibold tracking-tight">poorplexity</div>
@@ -1701,7 +1701,7 @@ function Workspace({
         ) : null}
       </AnimatePresence>
 
-      <div className="grid h-full min-h-0 gap-3 sm:gap-4 lg:grid-cols-[320px_minmax(0,1fr)]">
+      <div className="grid gap-3 sm:gap-4 lg:h-full lg:min-h-0 lg:grid-cols-[320px_minmax(0,1fr)]">
         <aside
           className={joinClasses(
             'fixed inset-y-4 left-4 z-40 flex w-[min(88vw,340px)] min-h-0 flex-col rounded-3xl bg-card/92 shadow-lg backdrop-blur-sm transition-transform duration-200 lg:static lg:w-auto lg:translate-x-0 lg:bg-card/75 lg:shadow-sm',
@@ -1797,7 +1797,7 @@ function Workspace({
 
           <Separator />
 
-          <div className="min-h-0 flex-1 overflow-y-auto p-3">
+          <div className="flex-1 overflow-visible p-3 lg:min-h-0 lg:overflow-y-auto">
             {searchQuery.trim() ? (
               <div className="space-y-4">
                 <div className="space-y-2">
@@ -2027,7 +2027,7 @@ function Workspace({
           ) : null}
 
           {mainView === 'settings' ? (
-            <div className="min-h-0 flex-1 overflow-y-auto px-4 py-3 sm:px-5 sm:py-5">
+              <div className="flex-1 overflow-visible px-4 py-3 sm:px-5 sm:py-5 lg:min-h-0 lg:overflow-y-auto">
               <div className="mx-auto max-w-5xl space-y-5">
                 <Card className="shadow-none">
                   <CardHeader>
@@ -2238,7 +2238,7 @@ function Workspace({
             </div>
           ) : selectedChat ? (
             <>
-              <div className="min-h-0 flex-1 overflow-y-auto">
+              <div className="flex-1 overflow-visible lg:min-h-0 lg:overflow-y-auto">
                 <div className="mx-auto flex max-w-5xl flex-col gap-4 px-4 py-3 sm:gap-5 sm:px-5 sm:py-5">
                   {showChatSettingsPanel ? (
                     <Card className="shadow-none">
