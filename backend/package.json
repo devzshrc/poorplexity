@@ -1,0 +1,27 @@
+{
+  "name": "backend",
+  "module": "index.ts",
+  "type": "module",
+  "private": true,
+  "scripts": {
+    "migrate": "bun migrate.ts"
+  },
+  "devDependencies": {
+    "@types/bun": "latest",
+    "@types/pg": "^8.20.0"
+  },
+  "peerDependencies": {
+    "typescript": "^5"
+  },
+  "dependencies": {
+    "@google/genai": "^1.50.1",
+    "@tavily/core": "^0.7.2",
+    "@types/express": "^5.0.6",
+    "better-auth": "^1.6.9",
+    "dotenv": "^17.4.2",
+    "express": "^5.2.1",
+    "groq-sdk": "^1.1.2",
+    "pg": "^8.20.0",
+    "postgres": "^3.4.9"
+  }
+}
