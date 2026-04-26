@@ -1,7 +1,17 @@
-import { authHandler, getSession } from "./src/auth/middleware";
-import { CORS_HEADERS, SSE_HEADERS, sseEvent } from "./src/sse";
-import { webSearch } from "./src/search";
-import { buildPrompt, streamAnswer, getFollowUps } from "./src/llm";
+const isRenderBuild = process.env.RENDER === "true" && !process.env.PORT;
+
+if (isRenderBuild) {
+  console.log("Render build detected without PORT; skipping server startup.");
+  process.exit(0);
+}
+
+const [{ authHandler, getSession }, { CORS_HEADERS, SSE_HEADERS, sseEvent }, { webSearch }, { buildPrompt, streamAnswer, getFollowUps }] =
+  await Promise.all([
+    import("./src/auth/middleware"),
+    import("./src/sse"),
+    import("./src/search"),
+    import("./src/llm"),
+  ]);
 
 function json(data: unknown, status = 200): Response {
   return new Response(JSON.stringify(data), {
@@ -16,19 +26,17 @@ Bun.serve({
   port,
 
   routes: {
-    // ── Auth (BetterAuth handles all /api/auth/* paths) ─────────────────────
+    // Auth (BetterAuth handles all /api/auth/* paths)
     "/api/auth/*": authHandler,
 
-    // ── Conversation (protected) ─────────────────────────────────────────────
+    // Conversation (protected)
     "/conversation": {
       OPTIONS: () => new Response(null, { status: 204, headers: CORS_HEADERS }),
 
       POST: async (req) => {
-        // ── Auth guard ──────────────────────────────────────────────────────
         const session = await getSession(req);
         if (!session) return json({ error: "Unauthorized" }, 401);
 
-        // ── Input validation ────────────────────────────────────────────────
         let query: string;
         try {
           const body = (await req.json()) as { query?: unknown };
@@ -36,10 +44,10 @@ Bun.serve({
         } catch {
           return json({ error: "Invalid request body" }, 400);
         }
+
         if (!query) return json({ error: "query is required" }, 400);
         if (query.length > 500) return json({ error: "query too long" }, 400);
 
-        // ── Stream ──────────────────────────────────────────────────────────
         const body = new ReadableStream({
           async start(controller) {
             try {
