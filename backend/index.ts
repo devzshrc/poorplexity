@@ -1,4 +1,7 @@
-const isRenderBuild = process.env.RENDER === "true" && !process.env.PORT;
+const isRenderBuild =
+  process.env.RENDER === "true" &&
+  process.env.RENDER_SERVICE_TYPE === "web" &&
+  !process.env.RENDER_WEB_CONCURRENCY;
 
 if (isRenderBuild) {
   console.log("Render build detected without PORT; skipping server startup.");
