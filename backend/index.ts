@@ -4,8 +4,22 @@ const isRenderBuild = isRender && isRenderWeb && !process.env.RENDER_WEB_CONCURR
 const isRenderRuntime = isRender && isRenderWeb && !!process.env.RENDER_WEB_CONCURRENCY;
 
 if (isRenderBuild) {
-  console.log("Render build detected without PORT; skipping server startup.");
-  process.exit(0);
+  console.log("Render build detected without runtime port; bundling server.");
+  const proc = Bun.spawnSync([
+    "bun",
+    "build",
+    "./server.ts",
+    "--target",
+    "bun",
+    "--outfile",
+    "./dist/server.js",
+  ], {
+    cwd: import.meta.dir,
+    stdout: "inherit",
+    stderr: "inherit",
+  });
+
+  process.exit(proc.exitCode ?? 0);
 }
 
 if (isRenderRuntime) {
