@@ -20,7 +20,6 @@ import {
   LogIn,
   LogOut,
   MessageSquare,
-  Moon,
   MoreHorizontal,
   PanelLeft,
   Pencil,
@@ -32,9 +31,7 @@ import {
   Settings,
   Sparkles,
   Star,
-  Sun,
   Trash2,
-  UserRound,
   X,
 } from 'lucide-react'
 
@@ -240,8 +237,6 @@ type SSEHandlers = {
   onError: (message: string) => void
 }
 
-type FilterValue = 'all' | 'unfiled' | 'archived' | 'trash' | string
-type SortValue = 'recent' | 'title' | 'activity'
 type MainView = 'chat' | 'settings'
 
 const MODEL_OPTIONS = [
@@ -408,19 +403,8 @@ async function consumeStream(res: Response, handlers: SSEHandlers, signal: Abort
   if (!signal.aborted) handlers.onDone()
 }
 
-function ThemeToggle({ theme, onToggle }: { theme: ThemeMode; onToggle: () => void }) {
-  return (
-    <Button
-      variant="outline"
-      size="icon-sm"
-      className="h-9 w-9"
-      onClick={onToggle}
-      title={theme === 'dark' ? 'Switch to light mode' : 'Switch to dark mode'}
-      aria-label={theme === 'dark' ? 'Switch to light mode' : 'Switch to dark mode'}
-    >
-      {theme === 'dark' ? <Sun className="size-4" /> : <Moon className="size-4" />}
-    </Button>
-  )
+function ThemeToggle(_props: { theme: ThemeMode; onToggle: () => void }) {
+  return null
 }
 
 function MessageSources({ sources }: { sources: Source[] }) {
@@ -471,17 +455,49 @@ function WorkspaceSkeleton() {
   )
 }
 
+type AuthOverlayProps = {
+  isOpen: boolean
+  onClose: () => void
+}
+
 function AuthOverlay({
   isOpen,
   onClose,
-  onSignIn,
-  onSignUp,
-}: {
-  isOpen: boolean
-  onClose: () => void
-  onSignIn: () => void
-  onSignUp: () => void
-}) {
+}: AuthOverlayProps) {
+  const clerk = useClerk()
+  const [isSubmitting, setIsSubmitting] = useState(false)
+  const [authError, setAuthError] = useState('')
+  const redirectUrl = typeof window === 'undefined' ? '/' : window.location.href
+
+  useEffect(() => {
+    if (!isOpen) {
+      setAuthError('')
+      setIsSubmitting(false)
+    }
+  }, [isOpen])
+
+  const continueWithGoogle = async () => {
+    setIsSubmitting(true)
+    setAuthError('')
+    try {
+      await (clerk.client.signIn as unknown as {
+        authenticateWithRedirect: (params: {
+          strategy: 'oauth_google'
+          redirectUrl: string
+          redirectUrlComplete: string
+        }) => Promise<unknown>
+      }).authenticateWithRedirect({
+        strategy: 'oauth_google',
+        redirectUrl,
+        redirectUrlComplete: redirectUrl,
+      })
+    } catch (error) {
+      setAuthError(error instanceof Error ? error.message : 'Google sign-in failed.')
+    } finally {
+      setIsSubmitting(false)
+    }
+  }
+
   return (
     <AnimatePresence>
       {isOpen ? (
@@ -492,22 +508,41 @@ function AuthOverlay({
           <motion.div {...fadeUp} className="w-full max-w-sm">
             <Card className="premium-surface w-full shadow-none">
               <CardHeader>
-                <CardTitle className="text-lg">Sign in to send</CardTitle>
-                <CardDescription>
-                  Read the workspace freely. Sign in only when you want to send, save, branch, export, or keep history.
-                </CardDescription>
+                <div className="flex items-start justify-between gap-3">
+                  <div>
+                    <CardTitle className="text-lg">Continue with Google</CardTitle>
+                    <CardDescription className="mt-1">
+                      Sign in to send, save, branch, export, and keep your workspace without leaving our UI first.
+                    </CardDescription>
+                  </div>
+                  <Button variant="ghost" size="icon-sm" title="Close sign-in" onClick={onClose}>
+                    <X className="size-4" />
+                  </Button>
+                </div>
               </CardHeader>
-              <CardContent className="space-y-3">
-                <Button className="h-10 w-full justify-center" onClick={onSignIn}>
-                  <LogIn className="mr-2 size-4" />
-                  Sign in
+              <CardContent className="space-y-4">
+                <div className="rounded-2xl bg-muted/60 px-4 py-3 text-sm text-muted-foreground">
+                  We only support Google sign-in right now, so the flow stays short and clean.
+                </div>
+
+                <Button className="h-11 w-full justify-center" disabled={isSubmitting} onClick={() => void continueWithGoogle()}>
+                  {isSubmitting ? <Loader2 className="mr-2 size-4 animate-spin" /> : <LogIn className="mr-2 size-4" />}
+                  Continue with Google
                 </Button>
-                <Button variant="outline" className="h-10 w-full justify-center" onClick={onSignUp}>
-                  <UserRound className="mr-2 size-4" />
-                  Create account
-                </Button>
+
+                {authError ? (
+                  <Alert variant="destructive">
+                    <AlertCircle className="size-4" />
+                    <AlertDescription>{authError}</AlertDescription>
+                  </Alert>
+                ) : null}
+
+                <p className="text-center text-xs text-muted-foreground">
+                  This sheet is ours. Clerk only handles the secure Google session once you continue.
+                </p>
+
                 <Button variant="ghost" className="w-full justify-center" onClick={onClose}>
-                  Close
+                  Continue without signing in
                 </Button>
               </CardContent>
             </Card>
@@ -656,7 +691,6 @@ function PublicWorkspace({
   theme: ThemeMode
   onToggleTheme: () => void
 }) {
-  const clerk = useClerk()
   const [composer, setComposer] = useState('')
   const [showAuth, setShowAuth] = useState(false)
   const [showSidebar, setShowSidebar] = useState(false)
@@ -670,8 +704,6 @@ function PublicWorkspace({
     window.localStorage.setItem('poorplexity-pending-draft', composer.trim())
     setShowAuth(true)
   }
-
-  const redirectUrl = typeof window === 'undefined' ? '/' : window.location.origin
 
   return (
     <div className="relative h-dvh overflow-hidden bg-background p-4 sm:p-6">
@@ -753,11 +785,11 @@ function PublicWorkspace({
                 </p>
               </div>
               <div className="flex flex-col gap-2 sm:flex-row sm:items-center">
-                <Button className="h-10 sm:min-w-28" variant="outline" onClick={() => clerk.redirectToSignIn({ signInFallbackRedirectUrl: redirectUrl })}>
+                <Button className="h-10 sm:min-w-28" variant="outline" onClick={openAuth}>
                   Sign in
                 </Button>
-                <Button className="h-10 sm:min-w-36" onClick={() => clerk.redirectToSignUp({ signUpFallbackRedirectUrl: redirectUrl })}>
-                  Create account
+                <Button className="h-10 sm:min-w-36" onClick={openAuth}>
+                  Continue with Google
                 </Button>
               </div>
             </div>
@@ -817,7 +849,7 @@ function PublicWorkspace({
               />
               <div className="mt-3 flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
                 <p className="text-[11px] text-muted-foreground sm:text-xs">Your draft will be preserved through sign-in.</p>
-                <Button className="h-11 w-full sm:w-auto" disabled={!composer.trim()} onClick={openAuth}>
+                <Button className="h-11 w-full sm:w-auto" disabled={!composer.trim()} onClick={() => openAuth()}>
                   <Send className="mr-2 size-4" />
                   Send
                 </Button>
@@ -830,8 +862,6 @@ function PublicWorkspace({
       <AuthOverlay
         isOpen={showAuth}
         onClose={() => setShowAuth(false)}
-        onSignIn={() => clerk.redirectToSignIn({ signInFallbackRedirectUrl: redirectUrl })}
-        onSignUp={() => clerk.redirectToSignUp({ signUpFallbackRedirectUrl: redirectUrl })}
       />
     </div>
   )
@@ -851,8 +881,7 @@ function Workspace({
   const [workspace, setWorkspace] = useState<WorkspacePayload | null>(null)
   const [chatCache, setChatCache] = useState<Record<string, ChatDetail>>({})
   const [selectedChatId, setSelectedChatId] = useState<string | null>(null)
-  const [activeFilter, setActiveFilter] = useState<FilterValue>('all')
-  const [sortBy, setSortBy] = useState<SortValue>('recent')
+  const [selectedFolderId, setSelectedFolderId] = useState<string | null>(null)
   const [composer, setComposer] = useState('')
   const [composerUseWebSearch, setComposerUseWebSearch] = useState(true)
   const [newFolderName, setNewFolderName] = useState('')
@@ -981,7 +1010,6 @@ function Workspace({
 
   const folders = workspace?.folders ?? []
   const chats = workspace?.chats ?? []
-  const trash = workspace?.trash ?? []
   const selectedChat = selectedChatId ? chatCache[selectedChatId] ?? null : null
   const currentFolderId = selectedChat?.folderId ?? null
   const userInitial = (workspace?.user.displayName || 'P').trim().charAt(0).toUpperCase()
@@ -1015,23 +1043,16 @@ function Workspace({
   }, [searchQuery])
 
   const filteredChats = useMemo(() => {
-    const base = activeFilter === 'trash'
-      ? trash
-      : activeFilter === 'archived'
-        ? chats.filter((chat) => chat.isArchived)
-        : chats.filter((chat) => {
-            if (chat.isArchived) return false
-            if (activeFilter === 'all') return true
-            if (activeFilter === 'unfiled') return chat.folderId === null
-            return chat.folderId === activeFilter
-          })
+    const base = chats.filter((chat) => {
+      if (chat.isArchived) return false
+      if (!selectedFolderId) return true
+      return chat.folderId === selectedFolderId
+    })
     return [...base].sort((a, b) => {
-      if (sortBy === 'title') return a.title.localeCompare(b.title)
-      if (sortBy === 'activity') return b.messageCount - a.messageCount || +new Date(b.updatedAt) - +new Date(a.updatedAt)
       if (a.isPinned !== b.isPinned) return a.isPinned ? -1 : 1
       return +new Date(b.lastMessageAt) - +new Date(a.lastMessageAt)
     })
-  }, [activeFilter, chats, sortBy, trash])
+  }, [chats, selectedFolderId])
 
   const groupedChatsCount = useMemo(() => {
     const next = new Map<string | null, number>()
@@ -1046,9 +1067,7 @@ function Workspace({
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
-          folderId: activeFilter !== 'all' && activeFilter !== 'unfiled' && activeFilter !== 'archived' && activeFilter !== 'trash'
-            ? activeFilter
-            : preferenceForm.defaultFolderId,
+          folderId: selectedFolderId ?? preferenceForm.defaultFolderId,
           branchFromChatId: branch?.chatId ?? null,
           branchFromMessageId: branch?.messageId ?? null,
         }),
@@ -1142,14 +1161,6 @@ function Workspace({
     if (!res.ok && res.status !== 204) throw new Error((await res.json().catch(() => ({ error: `HTTP ${res.status}` })) as { error?: string }).error ?? `HTTP ${res.status}`)
     await loadWorkspace(false)
     setSelectedChatId(null)
-    setActiveFilter('trash')
-  }
-
-  const restoreDeletedChat = async (chatId: string) => {
-    const res = await authorizedFetch(`/api/chats/${chatId}/restore`, { method: 'POST' })
-    if (!res.ok) throw new Error((await res.json().catch(() => ({ error: `HTTP ${res.status}` })) as { error?: string }).error ?? `HTTP ${res.status}`)
-    await loadWorkspace(false)
-    setActiveFilter('all')
   }
 
   const attachStreamToAssistant = async (res: Response, chatId: string, signal: AbortSignal) => {
@@ -1229,7 +1240,7 @@ function Workspace({
     abortRef.current = controller
 
     try {
-      if (!activeChatId || activeFilter === 'trash') activeChatId = await createNewChat()
+      if (!activeChatId) activeChatId = await createNewChat()
       if (!activeChatId) throw new Error('Unable to create a chat.')
 
       const now = new Date().toISOString()
@@ -1563,13 +1574,13 @@ function Workspace({
         className="space-y-1"
         style={{ paddingLeft: depth ? `${depth * 10}px` : undefined }}
       >
-        <div className={joinClasses('premium-surface relative rounded-2xl bg-background/70 px-3 py-3 transition-colors hover:-translate-y-px', activeFilter === folder.id && 'bg-muted/60')}>
+        <div className={joinClasses('premium-surface relative rounded-2xl bg-background/70 px-3 py-3 transition-colors hover:-translate-y-px', selectedFolderId === folder.id && 'bg-muted/60')}>
           <div className="flex items-center gap-3">
             <button
               type="button"
               className="flex min-w-0 flex-1 items-center gap-3 text-left"
               onClick={() => {
-                setActiveFilter(folder.id)
+                setSelectedFolderId(folder.id)
                 setShowSidebar(false)
               }}
               title={folder.name}
@@ -1747,14 +1758,9 @@ function Workspace({
             </div>
           </div>
 
-          <Separator />
-
           <div className="space-y-3 p-4">
             <div className="flex items-center justify-between gap-3">
-              <div>
-                <div className="text-[11px] font-medium uppercase tracking-[0.12em] text-muted-foreground/75">Browse</div>
-                <div className="text-[11px] text-muted-foreground/70">Switch views and sort chats.</div>
-              </div>
+              <div className="text-[11px] font-medium uppercase tracking-[0.12em] text-muted-foreground/75">Folders</div>
               <Button variant={showFolderCreator ? 'secondary' : 'outline'} size="sm" onClick={() => setShowFolderCreator((current) => !current)}>
                 <FolderPlus className="mr-2 size-4" />
                 {showFolderCreator ? 'Close' : 'New folder'}
@@ -1773,33 +1779,20 @@ function Workspace({
                 </Button>
               </div>
             ) : null}
-            <div className="space-y-2">
-              <div className="text-xs font-medium text-muted-foreground">View</div>
-              <div className="flex flex-wrap gap-2">
-                {(['all', 'unfiled', 'archived', 'trash'] as FilterValue[]).map((filter) => (
-                  <Button
-                    key={filter}
-                    variant={activeFilter === filter ? 'secondary' : 'ghost'}
-                    size="sm"
-                    onClick={() => {
-                      setActiveFilter(filter)
-                      setShowSidebar(false)
-                    }}
-                    title={`Show ${filter} chats`}
-                  >
-                    {filter === 'all' ? 'All' : filter === 'unfiled' ? 'Unfiled' : filter === 'archived' ? 'Archived' : `Trash (${workspace?.usage.deletedRecoverableCount ?? 0})`}
-                  </Button>
-                ))}
-              </div>
-            </div>
-            <div className="space-y-2">
-              <div className="text-xs font-medium text-muted-foreground">Sort chats</div>
-              <div className="flex items-center gap-2">
-                <Button variant={sortBy === 'recent' ? 'secondary' : 'ghost'} size="sm" onClick={() => setSortBy('recent')}>Recent</Button>
-                <Button variant={sortBy === 'title' ? 'secondary' : 'ghost'} size="sm" onClick={() => setSortBy('title')}>Title</Button>
-                <Button variant={sortBy === 'activity' ? 'secondary' : 'ghost'} size="sm" onClick={() => setSortBy('activity')}>Activity</Button>
-              </div>
-            </div>
+            {selectedFolderId ? (
+              <Button
+                variant="ghost"
+                size="sm"
+                className="justify-start"
+                onClick={() => {
+                  setSelectedFolderId(null)
+                  setShowSidebar(false)
+                }}
+              >
+                <ArrowLeft className="mr-2 size-4" />
+                Back to all chats
+              </Button>
+            ) : null}
           </div>
 
           <Separator />
@@ -1850,7 +1843,7 @@ function Workspace({
                       key={chat.id}
                     >
                       <button
-                        draggable={activeFilter !== 'trash'}
+                        draggable
                         onDragStart={(event: DragEvent<HTMLButtonElement>) => event.dataTransfer.setData('text/plain', chat.id)}
                         onClick={() => { setSelectedChatId(chat.id); setMainView('chat'); setShowSidebar(false) }}
                         className={joinClasses('premium-surface w-full rounded-2xl bg-background/70 px-3 py-2 text-left transition-colors hover:-translate-y-px hover:bg-muted', selectedChatId === chat.id && 'bg-muted')}
@@ -2080,13 +2073,6 @@ function Workspace({
                     <CardTitle className="text-base">Defaults and memory</CardTitle>
                   </CardHeader>
                   <CardContent className="grid gap-4 md:grid-cols-2">
-                    <div className="grid gap-2">
-                      <label className="text-sm font-medium">Theme</label>
-                      <div className="flex gap-2">
-                        <Button variant={theme === 'light' ? 'secondary' : 'outline'} onClick={theme === 'light' ? undefined : onToggleTheme}>Light</Button>
-                        <Button variant={theme === 'dark' ? 'secondary' : 'outline'} onClick={theme === 'dark' ? undefined : onToggleTheme}>Dark</Button>
-                      </div>
-                    </div>
                     <div className="grid gap-2">
                       <label className="text-sm font-medium">Roast level</label>
                       <select className="h-9 border border-input bg-transparent px-3 text-sm" value={preferenceForm.roastLevel} onChange={(event) => setPreferenceForm((current) => ({ ...current, roastLevel: event.target.value as PreferenceRecord['roastLevel'] }))}>
@@ -2521,23 +2507,6 @@ function Workspace({
                 </div>
               </div>
             </>
-          ) : activeFilter === 'trash' && trash.length ? (
-            <div className="flex flex-1 items-center justify-center px-6">
-              <div className="w-full max-w-xl space-y-3">
-                {trash.map((chat) => (
-                  <div key={chat.id} className="flex items-center justify-between rounded-2xl bg-background/70 px-4 py-3 shadow-sm">
-                    <div>
-                      <div className="text-sm font-medium">{chat.title}</div>
-                      <div className="text-xs text-muted-foreground">Restore window active</div>
-                    </div>
-                    <Button variant="outline" size="sm" onClick={() => restoreDeletedChat(chat.id).catch((error: Error) => setErrorMessage(error.message))}>
-                      <RotateCcw className="mr-2 size-3.5" />
-                      Restore
-                    </Button>
-                  </div>
-                ))}
-              </div>
-            </div>
           ) : (
             <div className="flex flex-1 items-center justify-center px-6">
               <div className="max-w-md text-center">
@@ -2561,24 +2530,17 @@ function Workspace({
 
 export default function App() {
   const { isLoaded, userId } = useAuth()
-  const [theme, setTheme] = useState<ThemeMode>('light')
+  const [theme] = useState<ThemeMode>('dark')
   const [route, setRoute] = useState<RouteState>(() => parseRoute(window.location.pathname))
 
   useEffect(() => {
-    const saved = (window.localStorage.getItem('poorplexity-theme') as ThemeMode | null) ?? 'light'
-    setTheme(saved)
-    document.documentElement.classList.toggle('dark', saved === 'dark')
+    document.documentElement.classList.add('dark')
     const onPopState = () => setRoute(parseRoute(window.location.pathname))
     window.addEventListener('popstate', onPopState)
     return () => window.removeEventListener('popstate', onPopState)
   }, [])
 
-  const toggleTheme = () => {
-    const next = theme === 'dark' ? 'light' : 'dark'
-    setTheme(next)
-    document.documentElement.classList.toggle('dark', next === 'dark')
-    window.localStorage.setItem('poorplexity-theme', next)
-  }
+  const toggleTheme = () => {}
 
   const navigateToProfile = (username: string) => {
     window.history.pushState({}, '', `/u/${username}`)
