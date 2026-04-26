@@ -1,0 +1,10 @@
+services:
+  - type: web
+    name: poorplexity-backend
+    runtime: node
+    rootDir: backend
+    buildCommand: bun install && bun run build
+    startCommand: bun run start
+    envVars:
+      - key: BUN_VERSION
+        value: 1.3.12
