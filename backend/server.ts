@@ -46,7 +46,33 @@ Bun.serve({
           }),
         });
 
-        return authHandler(authReq);
+        const authRes = await authHandler(authReq);
+        const location = authRes.headers.get("Location");
+
+        if (location) {
+          const redirectHeaders = new Headers(authRes.headers);
+          redirectHeaders.set("Location", location);
+          return new Response(null, {
+            status: authRes.status >= 300 && authRes.status < 400 ? authRes.status : 302,
+            headers: redirectHeaders,
+          });
+        }
+
+        try {
+          const data = await authRes.clone().json() as { url?: string; redirect?: boolean };
+          if (data.redirect && data.url) {
+            const redirectHeaders = new Headers(authRes.headers);
+            redirectHeaders.set("Location", data.url);
+            return new Response(null, {
+              status: 302,
+              headers: redirectHeaders,
+            });
+          }
+        } catch {
+          // Fall through to the original response when the body is not JSON.
+        }
+
+        return authRes;
       },
     },
 
