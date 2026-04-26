@@ -10,8 +10,10 @@ function json(data: unknown, status = 200): Response {
   });
 }
 
+const port = Number(process.env.PORT ?? "3598");
+
 Bun.serve({
-  port: 3598,
+  port,
 
   routes: {
     // ── Auth (BetterAuth handles all /api/auth/* paths) ─────────────────────
@@ -68,4 +70,4 @@ Bun.serve({
   },
 });
 
-console.log("Server running on http://localhost:3598");
+console.log(`Server running on http://localhost:${port}`);
