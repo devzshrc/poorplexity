@@ -3,7 +3,7 @@ import { Loader2, AlertCircle } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Alert, AlertDescription } from "@/components/ui/alert";
-import { signIn } from "@/lib/auth-client";
+import { API_BASE_URL } from "@/lib/config";
 
 function GoogleIcon() {
   return (
@@ -25,17 +25,27 @@ export function LoginPage() {
     setError(null);
 
     try {
-      const result = await signIn.social({
-        provider:    "google",
-        // Use the current origin so this works in any environment
-        callbackURL: `${window.location.origin}/`,
-      });
+      const form = document.createElement("form");
+      form.method = "POST";
+      form.action = `${API_BASE_URL}/api/auth/sign-in/social`;
+      form.style.display = "none";
 
-      if (result?.error) {
-        setError(result.error.message ?? "Sign-in failed. Please try again.");
-        setLoading(false);
+      const fields = {
+        provider: "google",
+        callbackURL: `${window.location.origin}/`,
+        errorCallbackURL: `${window.location.origin}/`,
+      };
+
+      for (const [name, value] of Object.entries(fields)) {
+        const input = document.createElement("input");
+        input.type = "hidden";
+        input.name = name;
+        input.value = value;
+        form.appendChild(input);
       }
-      // On success, BetterAuth redirects — component unmounts, no cleanup needed
+
+      document.body.appendChild(form);
+      form.submit();
     } catch {
       setError("Could not connect to the server. Please try again.");
       setLoading(false);
