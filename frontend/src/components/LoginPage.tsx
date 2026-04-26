@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { Loader2, AlertCircle } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
@@ -19,6 +19,37 @@ function GoogleIcon() {
 export function LoginPage() {
   const [loading, setLoading] = useState(false);
   const [error,   setError]   = useState<string | null>(null);
+
+  useEffect(() => {
+    const params = new URLSearchParams(window.location.search);
+    const authError = params.get("error");
+    const description = params.get("error_description");
+
+    if (!authError) return;
+
+    const friendlyMessage = (() => {
+      switch (authError) {
+        case "please_restart_the_process":
+          return "Google sign-in lost its state cookie mid-flight. Try again in a fresh tab.";
+        case "state_mismatch":
+          return "Google sign-in came back with the wrong state token. Start the flow again.";
+        case "invalid_callback_request":
+          return "The Google callback came back malformed. Try the sign-in flow again.";
+        case "invalid_code":
+          return "Google returned an invalid or expired auth code. Try again.";
+        default:
+          return description ?? authError.replace(/_/g, " ");
+      }
+    })();
+
+    setError(friendlyMessage);
+    setLoading(false);
+
+    const cleanUrl = new URL(window.location.href);
+    cleanUrl.searchParams.delete("error");
+    cleanUrl.searchParams.delete("error_description");
+    window.history.replaceState({}, "", cleanUrl.toString());
+  }, []);
 
   const handleGoogleLogin = async () => {
     setLoading(true);

@@ -41,3 +41,5 @@ export const ALLOWED_ORIGINS: string[] = (
   .split(",")
   .map((o) => o.trim().replace(/\/+$/, ""))
   .filter(Boolean);
+
+export const PRIMARY_FRONTEND_ORIGIN = ALLOWED_ORIGINS[0] ?? "http://localhost:5173";

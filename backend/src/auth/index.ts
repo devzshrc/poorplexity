@@ -1,7 +1,13 @@
 import { betterAuth } from "better-auth";
 import { Kysely, PostgresDialect } from "kysely";
 import { Pool } from "pg";
-import { env, IS_PROD, ALLOWED_ORIGINS, COOKIE_SAME_SITE, USE_SECURE_COOKIES } from "./env";
+import {
+  env,
+  ALLOWED_ORIGINS,
+  COOKIE_SAME_SITE,
+  USE_SECURE_COOKIES,
+  PRIMARY_FRONTEND_ORIGIN,
+} from "./env";
 
 const pool = new Pool({
   connectionString: env.DATABASE_URL,
@@ -38,6 +44,14 @@ export const auth = betterAuth({
   advanced: {
     cookiePrefix: "pp",             // "pp.session" etc.
     useSecureCookies: USE_SECURE_COOKIES,
+    trustedProxyHeaders: true,
+    ipAddress: {
+      ipAddressHeaders: [
+        "cf-connecting-ip",
+        "x-forwarded-for",
+        "x-real-ip",
+      ],
+    },
     defaultCookieAttributes: {
       httpOnly: true,               // JS cannot access session cookies
       sameSite: COOKIE_SAME_SITE,
@@ -65,6 +79,13 @@ export const auth = betterAuth({
 
   // Validates OAuth callbackURL and redirect targets against this list
   trustedOrigins: ALLOWED_ORIGINS,
+
+  onAPIError: {
+    errorURL: `${PRIMARY_FRONTEND_ORIGIN}/`,
+    onError: (error) => {
+      console.error("[better-auth]", error);
+    },
+  },
 });
 
 export type Session = typeof auth.$Infer.Session;
