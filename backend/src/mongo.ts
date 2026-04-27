@@ -1,5 +1,6 @@
 import mongoose, { Schema, Types } from "mongoose";
 import type { User } from "@clerk/backend";
+import { SUPPORTED_MODELS } from "../prompt";
 import { getDailyMessageLimits } from "./razorpay";
 import type { RazorpaySubscription } from "./razorpay";
 
@@ -26,6 +27,12 @@ const DEFAULT_FOLDER_NAMES = [
   "Workbench",
   "Thought shelf",
 ];
+
+const MAX_PROFILE_TEXT_LENGTH = 280;
+const MAX_MEMORY_NOTES_LENGTH = 4000;
+const MAX_SYSTEM_PROMPT_LENGTH = 4000;
+const MAX_CHAT_TITLE_LENGTH = 120;
+const SUPPORTED_MODEL_SET = new Set<string>(SUPPORTED_MODELS);
 
 const globalForMongoose = globalThis as typeof globalThis & {
   __poorplexityMongoosePromise?: Promise<typeof mongoose>;
@@ -408,6 +415,44 @@ function ensureObjectId(id: string): Types.ObjectId {
   return new Types.ObjectId(id);
 }
 
+function sanitizeNullableText(value: string | undefined, maxLength: number, field: string) {
+  if (value === undefined) return undefined;
+  const trimmed = value.trim();
+  if (!trimmed) return null;
+  if (trimmed.length > maxLength) {
+    throw new Error(`${field} is too long`);
+  }
+  return trimmed;
+}
+
+function sanitizePreferredModel(model: string | undefined) {
+  if (model === undefined) return undefined;
+  const trimmed = model.trim();
+  if (!trimmed) throw new Error("Model is required");
+  if (!SUPPORTED_MODEL_SET.has(trimmed)) {
+    throw new Error("Unsupported model");
+  }
+  return trimmed;
+}
+
+function sanitizeImageUrl(value: string | undefined) {
+  const trimmed = sanitizeNullableText(value, 1000, "Image URL");
+  if (trimmed === undefined || trimmed === null) return trimmed;
+
+  let parsed: URL;
+  try {
+    parsed = new URL(trimmed);
+  } catch {
+    throw new Error("Image URL must be a valid URL");
+  }
+
+  if (!["http:", "https:"].includes(parsed.protocol)) {
+    throw new Error("Image URL must use http or https");
+  }
+
+  return parsed.toString();
+}
+
 function makeChatTitle(input: string): string {
   const compact = input.replace(/\s+/g, " ").trim();
   if (!compact) return "Untitled chat";
@@ -428,6 +473,87 @@ async function pickDefaultFolderName(clerkUserId: string) {
   }
 
   return `${base} ${Date.now().toString().slice(-4)}`;
+}
+
+async function findOwnedFolder(clerkUserId: string, folderId: string | Types.ObjectId) {
+  const objectId = typeof folderId === "string" ? ensureObjectId(folderId) : folderId;
+  return await ChatFolder.findOne({ _id: objectId, clerkUserId }).lean<any>();
+}
+
+async function resolveOwnedFolderId(clerkUserId: string, folderId: string | null | undefined) {
+  if (!folderId) return null;
+  const folder = await findOwnedFolder(clerkUserId, folderId);
+  if (!folder) throw new Error("Folder not found");
+  return ensureObjectId(String(folder._id));
+}
+
+async function assertValidFolderParent(params: {
+  clerkUserId: string;
+  folderId?: string | null;
+  parentFolderId?: string | null;
+}) {
+  const { clerkUserId, folderId, parentFolderId } = params;
+  if (parentFolderId === undefined) return undefined;
+  if (parentFolderId === null) return null;
+
+  const parent = await findOwnedFolder(clerkUserId, parentFolderId);
+  if (!parent) throw new Error("Parent folder not found");
+
+  const parentId = String(parent._id);
+  if (folderId && parentId === folderId) {
+    throw new Error("A folder cannot be its own parent");
+  }
+
+  if (folderId) {
+    let cursor = parent.parentFolderId ? String(parent.parentFolderId) : null;
+    while (cursor) {
+      if (cursor === folderId) {
+        throw new Error("Folder nesting cannot create a cycle");
+      }
+      const next = await ChatFolder.findOne({ _id: ensureObjectId(cursor), clerkUserId }, { parentFolderId: 1 }).lean<any>();
+      cursor = next?.parentFolderId ? String(next.parentFolderId) : null;
+    }
+  }
+
+  return ensureObjectId(parentId);
+}
+
+async function assertOwnedChat(clerkUserId: string, chatId: string) {
+  const chat = await Chat.findOne({
+    _id: ensureObjectId(chatId),
+    clerkUserId,
+    isDeleted: false,
+  }).lean<any>();
+
+  if (!chat) throw new Error("Chat not found");
+  return chat;
+}
+
+async function assertBranchSource(params: {
+  clerkUserId: string;
+  branchFromChatId?: string | null;
+  branchFromMessageId?: string | null;
+}) {
+  const { clerkUserId, branchFromChatId, branchFromMessageId } = params;
+  if (!branchFromChatId && !branchFromMessageId) {
+    return { chatId: null, messageId: null };
+  }
+
+  if (!branchFromChatId) {
+    throw new Error("branchFromChatId is required when branchFromMessageId is provided");
+  }
+
+  const sourceChat = await assertOwnedChat(clerkUserId, branchFromChatId);
+  if (!branchFromMessageId) {
+    return { chatId: String(sourceChat._id), messageId: null };
+  }
+
+  const messageExists = sourceChat.messages.some((message: any) => String(message._id) === branchFromMessageId);
+  if (!messageExists) {
+    throw new Error("Branch source message not found");
+  }
+
+  return { chatId: String(sourceChat._id), messageId: branchFromMessageId };
 }
 
 function makePreferenceRecord(user: AppUserDocument | any): UserPreferenceRecord {
@@ -752,9 +878,9 @@ export async function updateUserProfile(
   await ensureDatabase();
 
   const patch: Record<string, unknown> = {};
-  if (profile.displayName !== undefined) patch.customDisplayName = profile.displayName.trim() || null;
-  if (profile.imageUrl !== undefined) patch.customImageUrl = profile.imageUrl.trim() || null;
-  if (profile.bio !== undefined) patch.bio = profile.bio.trim() || null;
+  if (profile.displayName !== undefined) patch.customDisplayName = sanitizeNullableText(profile.displayName, 80, "Display name");
+  if (profile.imageUrl !== undefined) patch.customImageUrl = sanitizeImageUrl(profile.imageUrl);
+  if (profile.bio !== undefined) patch.bio = sanitizeNullableText(profile.bio, MAX_PROFILE_TEXT_LENGTH, "Bio");
   if (profile.publicUsername !== undefined) {
     patch.publicUsername = profile.publicUsername.trim() ? normalizePublicUsername(profile.publicUsername) : null;
   }
@@ -798,12 +924,12 @@ export async function updateUserPreferences(
   if (preferences.responseLength) patch.responseLength = preferences.responseLength;
   if (preferences.outputFormat) patch.outputFormat = preferences.outputFormat;
   if (preferences.answerMode) patch.answerMode = preferences.answerMode;
-  if (preferences.preferredModel) patch.preferredModel = preferences.preferredModel.trim();
+  if (preferences.preferredModel !== undefined) patch.preferredModel = sanitizePreferredModel(preferences.preferredModel);
   if (typeof preferences.onlyFromSources === "boolean") patch.onlyFromSources = preferences.onlyFromSources;
   if (preferences.defaultFolderId !== undefined) {
-    patch.defaultFolderId = preferences.defaultFolderId ? ensureObjectId(preferences.defaultFolderId) : null;
+    patch.defaultFolderId = await resolveOwnedFolderId(clerkUserId, preferences.defaultFolderId);
   }
-  if (preferences.memoryNotes !== undefined) patch.memoryNotes = preferences.memoryNotes.trim();
+  if (preferences.memoryNotes !== undefined) patch.memoryNotes = sanitizeNullableText(preferences.memoryNotes, MAX_MEMORY_NOTES_LENGTH, "Memory notes") ?? "";
   if (typeof preferences.hideChatSettingsPanel === "boolean") patch.hideChatSettingsPanel = preferences.hideChatSettingsPanel;
 
   const user = await AppUser.findOneAndUpdate(
@@ -920,24 +1046,28 @@ export async function deleteStoredUserData(clerkUserId: string) {
     Chat.deleteMany({ clerkUserId }),
     ChatFolder.deleteMany({ clerkUserId }),
     Activity.deleteMany({ clerkUserId }),
+    BillingWebhookEvent.deleteMany({ clerkUserId }),
     AppUser.deleteOne({ clerkUserId }),
   ]);
 }
 
 export async function createFolder(clerkUserId: string, name: string, parentFolderId?: string | null) {
   await ensureDatabase();
-  const trimmed = name.trim() || await pickDefaultFolderName(clerkUserId);
+  const rawName = name.trim();
+  if (rawName && rawName.length > 80) throw new Error("Folder name is too long");
+  const trimmed = rawName || await pickDefaultFolderName(clerkUserId);
+  const resolvedParentFolderId = await assertValidFolderParent({ clerkUserId, parentFolderId: parentFolderId ?? null });
   const folder = await ChatFolder.create({
     clerkUserId,
     name: trimmed,
-    parentFolderId: parentFolderId ? ensureObjectId(parentFolderId) : null,
+    parentFolderId: resolvedParentFolderId ?? null,
   });
   await recordActivity({
     clerkUserId,
     type: "folder.created",
     entityType: "folder",
     entityId: String(folder._id),
-    metadata: { name: trimmed, parentFolderId: parentFolderId ?? null },
+    metadata: { name: trimmed, parentFolderId: resolvedParentFolderId ? String(resolvedParentFolderId) : null },
   });
   return serializeFolder(folder.toObject());
 }
@@ -957,11 +1087,16 @@ export async function renameFolder(
   if (updates.name !== undefined) {
     const trimmed = updates.name.trim();
     if (!trimmed) throw new Error("Folder name is required");
+    if (trimmed.length > 80) throw new Error("Folder name is too long");
     patch.name = trimmed;
   }
 
   if (updates.parentFolderId !== undefined) {
-    patch.parentFolderId = updates.parentFolderId ? ensureObjectId(updates.parentFolderId) : null;
+    patch.parentFolderId = await assertValidFolderParent({
+      clerkUserId,
+      folderId,
+      parentFolderId: updates.parentFolderId,
+    }) ?? null;
   }
 
   if (typeof updates.isFavorite === "boolean") {
@@ -988,9 +1123,13 @@ export async function renameFolder(
 export async function deleteFolder(clerkUserId: string, folderId: string) {
   await ensureDatabase();
   const objectId = ensureObjectId(folderId);
+  const exists = await ChatFolder.exists({ _id: objectId, clerkUserId });
+  if (!exists) throw new Error("Folder not found");
 
   await Promise.all([
     Chat.updateMany({ clerkUserId, folderId: objectId }, { $set: { folderId: null } }),
+    ChatFolder.updateMany({ clerkUserId, parentFolderId: objectId }, { $set: { parentFolderId: null } }),
+    AppUser.updateOne({ clerkUserId, defaultFolderId: objectId }, { $set: { defaultFolderId: null } }),
     ChatFolder.deleteOne({ _id: objectId, clerkUserId }),
   ]);
   await recordActivity({
@@ -1028,12 +1167,17 @@ export async function createChat(params: {
   const defaults = await loadUserDefaults(params.clerkUserId);
   const title = params.title?.trim() || makeChatTitle(params.firstMessage || "");
   const chosenFolderId = params.folderId ?? defaults.defaultFolderId;
-  const folderId = chosenFolderId ? ensureObjectId(chosenFolderId) : null;
+  const folderId = await resolveOwnedFolderId(params.clerkUserId, chosenFolderId);
+  const branchSource = await assertBranchSource({
+    clerkUserId: params.clerkUserId,
+    branchFromChatId: params.branchFromChatId,
+    branchFromMessageId: params.branchFromMessageId,
+  });
 
   const chat = await Chat.create({
     clerkUserId: params.clerkUserId,
     folderId,
-    title: title || "Untitled chat",
+    title: (title || "Untitled chat").slice(0, MAX_CHAT_TITLE_LENGTH),
     messages: [],
     lastMessageAt: new Date(),
     isPinned: false,
@@ -1041,8 +1185,8 @@ export async function createChat(params: {
     isDeleted: false,
     deletedAt: null,
     restoreUntil: null,
-    branchFromChatId: params.branchFromChatId ? ensureObjectId(params.branchFromChatId) : null,
-    branchFromMessageId: params.branchFromMessageId ? ensureObjectId(params.branchFromMessageId) : null,
+    branchFromChatId: branchSource.chatId ? ensureObjectId(branchSource.chatId) : null,
+    branchFromMessageId: branchSource.messageId ? ensureObjectId(branchSource.messageId) : null,
     systemPrompt: "",
     useWebSearch: true,
     answerMode: defaults.answerMode,
@@ -1063,8 +1207,8 @@ export async function createChat(params: {
     metadata: {
       folderId: folderId ? String(folderId) : null,
       title: chat.title,
-      branchFromChatId: params.branchFromChatId ?? null,
-      branchFromMessageId: params.branchFromMessageId ?? null,
+      branchFromChatId: branchSource.chatId,
+      branchFromMessageId: branchSource.messageId,
     },
   });
 
@@ -1110,15 +1254,16 @@ export async function updateChat(
   if (typeof updates.title === "string") {
     const trimmed = updates.title.trim();
     if (!trimmed) throw new Error("Chat title is required");
+    if (trimmed.length > MAX_CHAT_TITLE_LENGTH) throw new Error("Chat title is too long");
     patch.title = trimmed;
   }
-  if (updates.folderId !== undefined) patch.folderId = updates.folderId ? ensureObjectId(updates.folderId) : null;
+  if (updates.folderId !== undefined) patch.folderId = await resolveOwnedFolderId(clerkUserId, updates.folderId);
   if (typeof updates.isPinned === "boolean") patch.isPinned = updates.isPinned;
   if (typeof updates.isArchived === "boolean") patch.isArchived = updates.isArchived;
-  if (typeof updates.systemPrompt === "string") patch.systemPrompt = updates.systemPrompt.trim();
+  if (typeof updates.systemPrompt === "string") patch.systemPrompt = sanitizeNullableText(updates.systemPrompt, MAX_SYSTEM_PROMPT_LENGTH, "System prompt") ?? "";
   if (typeof updates.useWebSearch === "boolean") patch.useWebSearch = updates.useWebSearch;
   if (updates.answerMode) patch.answerMode = updates.answerMode;
-  if (typeof updates.preferredModel === "string" && updates.preferredModel.trim()) patch.preferredModel = updates.preferredModel.trim();
+  if (updates.preferredModel !== undefined) patch.preferredModel = sanitizePreferredModel(updates.preferredModel);
   if (updates.responseLength) patch.responseLength = updates.responseLength;
   if (updates.outputFormat) patch.outputFormat = updates.outputFormat;
   if (updates.roastLevel) patch.roastLevel = updates.roastLevel;
@@ -1206,7 +1351,7 @@ export async function restoreChat(clerkUserId: string, chatId: string) {
 
 export async function branchChat(clerkUserId: string, chatId: string, messageId?: string | null) {
   await ensureDatabase();
-  const sourceChat = await findChatOrThrow(clerkUserId, chatId);
+  const sourceChat = await assertOwnedChat(clerkUserId, chatId);
   const branchAt = messageId
     ? sourceChat.messages.findIndex((message: any) => String(message._id) === messageId)
     : sourceChat.messages.length - 1;
@@ -1653,6 +1798,14 @@ export async function recordBillingWebhookEvent(params: {
     }
     throw error;
   }
+}
+
+export async function attachBillingWebhookEventUser(eventId: string, clerkUserId: string) {
+  await ensureDatabase();
+  await BillingWebhookEvent.updateOne(
+    { eventId, clerkUserId: null },
+    { $set: { clerkUserId } }
+  );
 }
 
 export async function buildAssistantMetadata(clerkUserId: string, chatId: string, webSearchUsed: boolean, sources: SourceRecord[]) {

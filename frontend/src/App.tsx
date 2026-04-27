@@ -1,9 +1,8 @@
 import { useEffect, useMemo, useRef, useState } from 'react'
-import type { DragEvent, ReactNode } from 'react'
+import type { ComponentPropsWithoutRef, DragEvent, ReactNode } from 'react'
 import ReactMarkdown from 'react-markdown'
 import remarkGfm from 'remark-gfm'
 import { ClerkLoaded, ClerkLoading, useAuth, useClerk } from '@clerk/react'
-import { AnimatePresence, motion } from 'motion/react'
 import {
   AlertCircle,
   Archive,
@@ -20,6 +19,7 @@ import {
   LogIn,
   LogOut,
   MessageSquare,
+  Moon,
   MoreHorizontal,
   PanelLeft,
   Pencil,
@@ -31,6 +31,7 @@ import {
   Settings,
   Sparkles,
   Star,
+  Sun,
   Trash2,
   X,
 } from 'lucide-react'
@@ -40,8 +41,10 @@ import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
 import { Input } from '@/components/ui/input'
+import { Select } from '@/components/ui/select'
 import { Separator } from '@/components/ui/separator'
 import { Skeleton } from '@/components/ui/skeleton'
+import { Switch } from '@/components/ui/switch'
 import { Textarea } from '@/components/ui/textarea'
 import { API_BASE_URL } from '@/lib/config'
 
@@ -245,22 +248,83 @@ const MODEL_OPTIONS = [
   'meta-llama/llama-4-scout-17b-16e-instruct',
 ] as const
 
-const fadeUp = {
-  initial: { opacity: 0, y: 14, scale: 0.992 },
-  animate: { opacity: 1, y: 0, scale: 1 },
-  exit: { opacity: 0, y: 10, scale: 0.994 },
-  transition: { duration: 0.22, ease: [0.22, 1, 0.36, 1] as const },
+const fadeUp = {}
+const subtleList = {}
+const fadeScale = {}
+
+type StaticMotionProps = {
+  initial?: unknown
+  animate?: unknown
+  exit?: unknown
+  transition?: unknown
+  variants?: unknown
+  whileHover?: unknown
+  whileTap?: unknown
+  layout?: unknown
 }
 
-const subtleList = {
-  animate: { transition: { staggerChildren: 0.05, delayChildren: 0.015 } },
+function StaticMotionDiv({
+  initial: _initial,
+  animate: _animate,
+  exit: _exit,
+  transition: _transition,
+  variants: _variants,
+  whileHover: _whileHover,
+  whileTap: _whileTap,
+  layout: _layout,
+  ...props
+}: ComponentPropsWithoutRef<'div'> & StaticMotionProps) {
+  return <div {...props} />
 }
 
-const fadeScale = {
-  initial: { opacity: 0, scale: 0.97, y: 6 },
-  animate: { opacity: 1, scale: 1 },
-  exit: { opacity: 0, scale: 0.98, y: 4 },
-  transition: { duration: 0.18, ease: [0.22, 1, 0.36, 1] as const },
+function StaticMotionSection({
+  initial: _initial,
+  animate: _animate,
+  exit: _exit,
+  transition: _transition,
+  variants: _variants,
+  whileHover: _whileHover,
+  whileTap: _whileTap,
+  layout: _layout,
+  ...props
+}: ComponentPropsWithoutRef<'section'> & StaticMotionProps) {
+  return <section {...props} />
+}
+
+function StaticMotionButton({
+  initial: _initial,
+  animate: _animate,
+  exit: _exit,
+  transition: _transition,
+  variants: _variants,
+  whileHover: _whileHover,
+  whileTap: _whileTap,
+  layout: _layout,
+  ...props
+}: ComponentPropsWithoutRef<'button'> & StaticMotionProps) {
+  return <button {...props} />
+}
+
+function StaticMotionAnchor({
+  initial: _initial,
+  animate: _animate,
+  exit: _exit,
+  transition: _transition,
+  variants: _variants,
+  whileHover: _whileHover,
+  whileTap: _whileTap,
+  layout: _layout,
+  ...props
+}: ComponentPropsWithoutRef<'a'> & StaticMotionProps) {
+  return <a {...props} />
+}
+
+const AnimatePresence = ({ children }: { children: ReactNode }) => <>{children}</>
+const motion = {
+  a: StaticMotionAnchor,
+  button: StaticMotionButton,
+  div: StaticMotionDiv,
+  section: StaticMotionSection,
 }
 
 function joinClasses(...parts: Array<string | false | null | undefined>) {
@@ -403,8 +467,19 @@ async function consumeStream(res: Response, handlers: SSEHandlers, signal: Abort
   if (!signal.aborted) handlers.onDone()
 }
 
-function ThemeToggle(_props: { theme: ThemeMode; onToggle: () => void }) {
-  return null
+function ThemeToggle({ theme, onToggle }: { theme: ThemeMode; onToggle: () => void }) {
+  return (
+    <Button
+      variant="outline"
+      size="icon-sm"
+      className="h-9 w-9"
+      onClick={onToggle}
+      title={theme === 'dark' ? 'Switch to light mode' : 'Switch to dark mode'}
+      aria-label={theme === 'dark' ? 'Switch to light mode' : 'Switch to dark mode'}
+    >
+      {theme === 'dark' ? <Sun className="size-4" /> : <Moon className="size-4" />}
+    </Button>
+  )
 }
 
 function MessageSources({ sources }: { sources: Source[] }) {
@@ -437,14 +512,14 @@ function WorkspaceSkeleton() {
   return (
     <div className="min-h-dvh overflow-x-hidden bg-background p-3 sm:p-6 lg:h-dvh lg:overflow-hidden">
       <div className="grid gap-3 sm:gap-4 lg:h-full lg:min-h-0 lg:grid-cols-[320px_minmax(0,1fr)]">
-        <div className="rounded-3xl bg-card/70 p-4 shadow-sm">
+        <div className="rounded-md border border-border bg-card/70 p-4 shadow-sm">
           <Skeleton className="h-10 w-full" />
           <Skeleton className="mt-4 h-8 w-24" />
           <Skeleton className="mt-3 h-9 w-full" />
           <Skeleton className="mt-6 h-20 w-full" />
           <Skeleton className="mt-3 h-20 w-full" />
         </div>
-        <div className="rounded-3xl bg-card/70 p-5 shadow-sm">
+        <div className="rounded-md border border-border bg-card/70 p-5 shadow-sm">
           <Skeleton className="h-8 w-48" />
           <Skeleton className="mt-6 h-24 w-full" />
           <Skeleton className="mt-4 h-24 w-4/5" />
@@ -521,7 +596,7 @@ function AuthOverlay({
                 </div>
               </CardHeader>
               <CardContent className="space-y-4">
-                <div className="rounded-2xl bg-muted/60 px-4 py-3 text-sm text-muted-foreground">
+                <div className="rounded-md border border-border bg-muted/60 px-4 py-3 text-sm text-muted-foreground">
                   We only support Google sign-in right now, so the flow stays short and clean.
                 </div>
 
@@ -586,7 +661,7 @@ function PublicProfilePage({
   return (
     <div className="min-h-screen bg-background px-4 py-4 sm:px-6">
       <div className="mx-auto max-w-5xl space-y-4">
-        <div className="flex items-center justify-between gap-3 rounded-3xl bg-card/80 px-4 py-3 shadow-sm">
+        <div className="flex items-center justify-between gap-3 rounded-md border border-border bg-card/80 px-4 py-3 shadow-sm">
           <div className="flex items-center gap-3">
             <Button variant="outline" size="icon-sm" onClick={onBack} title="Back to workspace">
               <ArrowLeft className="size-4" />
@@ -613,9 +688,9 @@ function PublicProfilePage({
               <CardHeader>
                 <div className="flex items-center gap-4">
                   {profile.profile.imageUrl ? (
-                    <img src={profile.profile.imageUrl} alt="" className="size-16 rounded-2xl object-cover" />
+                    <img src={profile.profile.imageUrl} alt="" className="size-16 rounded-md object-cover" />
                   ) : (
-                    <div className="flex size-16 items-center justify-center rounded-2xl bg-muted text-lg font-semibold">
+                    <div className="flex size-16 items-center justify-center rounded-md bg-muted text-lg font-semibold">
                       {profile.profile.displayName.charAt(0).toUpperCase()}
                     </div>
                   )}
@@ -737,7 +812,7 @@ function PublicWorkspace({
       <div className="grid gap-3 lg:gap-4 lg:h-full lg:min-h-0 lg:grid-cols-[320px_minmax(0,1fr)]">
         <aside
           className={joinClasses(
-            'fixed inset-y-4 left-4 z-40 flex w-[min(88vw,340px)] min-h-0 flex-col rounded-3xl bg-card/92 shadow-lg backdrop-blur-sm transition-transform duration-200 lg:static lg:w-auto lg:translate-x-0 lg:bg-card/75 lg:shadow-sm',
+            'fixed inset-y-4 left-4 z-40 flex w-[min(88vw,340px)] min-h-0 flex-col rounded-md border border-border bg-card/92 shadow-lg backdrop-blur-sm transition-transform duration-200 lg:static lg:w-auto lg:translate-x-0 lg:bg-card/75 lg:shadow-sm',
             showSidebar ? 'translate-x-0' : '-translate-x-[120%]',
           )}
         >
@@ -753,7 +828,7 @@ function PublicWorkspace({
               <Plus className="mr-2 size-4" />
               New chat
             </Button>
-            <div className="rounded-2xl bg-background/60 p-3">
+            <div className="rounded-md border border-border bg-background/60 p-3">
               <div className="mb-2 text-xs font-medium text-muted-foreground">Try these</div>
               <div className="space-y-2">
                 {examples.map((item) => (
@@ -775,7 +850,7 @@ function PublicWorkspace({
           </div>
         </aside>
 
-        <main className="flex min-h-0 flex-col rounded-3xl bg-card/75 shadow-sm backdrop-blur-sm">
+        <main className="flex min-h-0 flex-col rounded-md border border-border bg-card/75 shadow-sm backdrop-blur-sm">
           <div className="px-4 py-3 sm:px-5 sm:py-4">
             <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
               <div className="min-w-0">
@@ -819,7 +894,7 @@ function PublicWorkspace({
               </Card>
               </motion.div>
 
-              <motion.section {...fadeUp} className="premium-surface rounded-3xl bg-background/70 px-4 py-4 sm:px-5">
+              <motion.section {...fadeUp} className="premium-surface rounded-md border border-border bg-background/70 px-4 py-4 sm:px-5">
                 <div className="mb-3 flex items-center gap-2">
                   <Badge variant="secondary">Assistant</Badge>
                   <span className="text-xs text-muted-foreground">Preview</span>
@@ -925,7 +1000,6 @@ function Workspace({
   })
   const [isSavingProfile, setIsSavingProfile] = useState(false)
   const [isSavingPreferences, setIsSavingPreferences] = useState(false)
-  const [showChatSettingsPanel, setShowChatSettingsPanel] = useState(true)
   const [isDeletingData, setIsDeletingData] = useState(false)
   const [isExportingData, setIsExportingData] = useState(false)
   const [isStartingSubscription, setIsStartingSubscription] = useState(false)
@@ -1000,10 +1074,6 @@ function Workspace({
   }, [workspace?.user])
 
   useEffect(() => {
-    setShowChatSettingsPanel(!workspace?.user.preferences.hideChatSettingsPanel)
-  }, [workspace?.user.preferences.hideChatSettingsPanel])
-
-  useEffect(() => {
     const limitReached = workspace?.usage.remainingToday === 0 && !workspace?.user.billing.isPremium
     setShowUpgradePrompt(Boolean(limitReached))
   }, [workspace?.usage.remainingToday, workspace?.user.billing.isPremium])
@@ -1013,6 +1083,7 @@ function Workspace({
   const selectedChat = selectedChatId ? chatCache[selectedChatId] ?? null : null
   const currentFolderId = selectedChat?.folderId ?? null
   const userInitial = (workspace?.user.displayName || 'P').trim().charAt(0).toUpperCase()
+  const isSettingsOpen = mainView === 'settings'
 
   useEffect(() => {
     if (selectedChat?.settings) {
@@ -1377,17 +1448,6 @@ function Workspace({
       })
       if (!res.ok) throw new Error((await res.json().catch(() => ({ error: `HTTP ${res.status}` })) as { error?: string }).error ?? `HTTP ${res.status}`)
       await loadChat(selectedChatId)
-      if (!workspace?.user.preferences.hideChatSettingsPanel) {
-        const prefRes = await authorizedFetch('/api/settings/preferences', {
-          method: 'PATCH',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ hideChatSettingsPanel: true }),
-        })
-        if (!prefRes.ok) throw new Error((await prefRes.json().catch(() => ({ error: `HTTP ${prefRes.status}` })) as { error?: string }).error ?? `HTTP ${prefRes.status}`)
-        const prefPayload = await prefRes.json() as { user: WorkspacePayload['user'] }
-        setWorkspace((current) => current ? { ...current, user: prefPayload.user } : current)
-        setShowChatSettingsPanel(false)
-      }
     } finally {
       setIsSavingChatSettings(false)
     }
@@ -1574,7 +1634,7 @@ function Workspace({
         className="space-y-1"
         style={{ paddingLeft: depth ? `${depth * 10}px` : undefined }}
       >
-        <div className={joinClasses('premium-surface relative rounded-2xl bg-background/70 px-3 py-3 transition-colors hover:-translate-y-px', selectedFolderId === folder.id && 'bg-muted/60')}>
+        <div className={joinClasses('premium-surface relative rounded-md border border-border bg-background/70 px-3 py-3 transition-colors hover:bg-muted/60', selectedFolderId === folder.id && 'bg-muted/60')}>
           <div className="flex items-center gap-3">
             <button
               type="button"
@@ -1610,7 +1670,7 @@ function Workspace({
           {openFolderMenuId === folder.id ? (
             <motion.div
               {...fadeUp}
-              className="absolute right-0 top-full z-20 mt-2 w-64 rounded-2xl bg-popover/95 p-1 shadow-lg backdrop-blur-sm"
+              className="absolute right-0 top-full z-20 mt-2 w-64 rounded-md border border-border bg-popover/95 p-1 shadow-lg backdrop-blur-sm"
             >
               {[
                 {
@@ -1676,7 +1736,7 @@ function Workspace({
         <div className="min-w-0">
           <div className="truncate text-base font-semibold tracking-tight">poorplexity</div>
           <div className="text-[11px] text-muted-foreground">
-            {mainView === 'settings' ? 'Settings' : selectedChat ? selectedChat.title : 'Research workspace'}
+            {selectedChat ? selectedChat.title : 'Research workspace'}
           </div>
         </div>
         <div className="flex items-center gap-2">
@@ -1704,7 +1764,7 @@ function Workspace({
       <div className="grid gap-3 sm:gap-4 lg:h-full lg:min-h-0 lg:grid-cols-[320px_minmax(0,1fr)]">
         <aside
           className={joinClasses(
-            'fixed inset-y-4 left-4 z-40 flex w-[min(88vw,340px)] min-h-0 flex-col rounded-3xl bg-card/92 shadow-lg backdrop-blur-sm transition-transform duration-200 lg:static lg:w-auto lg:translate-x-0 lg:bg-card/75 lg:shadow-sm',
+            'fixed inset-y-4 left-4 z-40 flex w-[min(88vw,340px)] min-h-0 flex-col rounded-md border border-border bg-card/92 shadow-lg backdrop-blur-sm transition-transform duration-200 lg:static lg:w-auto lg:translate-x-0 lg:bg-card/75 lg:shadow-sm',
             showSidebar ? 'translate-x-0' : '-translate-x-[120%]',
           )}
         >
@@ -1767,12 +1827,12 @@ function Workspace({
               </Button>
             </div>
             {showFolderCreator ? (
-              <div className="grid gap-2 rounded-2xl bg-background/65 p-3">
+              <div className="grid gap-2 rounded-md border border-border bg-background/65 p-3">
                 <Input value={newFolderName} onChange={(event) => setNewFolderName(event.target.value)} placeholder="Folder name (optional)" />
-                <select className="h-9 border border-input bg-transparent px-3 text-sm" value={folderParentId} onChange={(event) => setFolderParentId(event.target.value)}>
+                <Select value={folderParentId} onChange={(event) => setFolderParentId(event.target.value)}>
                   <option value="root">Top level</option>
                   {folders.map((folder) => <option key={folder.id} value={folder.id}>{folder.name}</option>)}
-                </select>
+                </Select>
                 <Button variant="outline" disabled={isCreatingFolder} onClick={() => createFolder().then(() => setShowFolderCreator(false)).catch((error: Error) => setErrorMessage(error.message))}>
                   {isCreatingFolder ? <Loader2 className="mr-2 size-4 animate-spin" /> : <FolderPlus className="mr-2 size-4" />}
                   Create folder
@@ -1808,7 +1868,7 @@ function Workspace({
                       variants={fadeUp}
                       key={chat.id}
                       onClick={() => { setSelectedChatId(chat.id); setMainView('chat'); setShowSidebar(false) }}
-                      className={joinClasses('premium-surface w-full rounded-2xl bg-background/70 px-3 py-2 text-left transition-colors hover:-translate-y-px hover:bg-muted', selectedChatId === chat.id && 'bg-muted')}
+                      className={joinClasses('premium-surface w-full rounded-md border border-border bg-background/70 px-3 py-2 text-left transition-colors hover:bg-muted', selectedChatId === chat.id && 'bg-muted')}
                     >
                       <div className="truncate text-sm font-medium">{chat.title}</div>
                       <div className="mt-1 line-clamp-2 text-xs text-muted-foreground">{chat.lastMessagePreview}</div>
@@ -1824,7 +1884,7 @@ function Workspace({
                       variants={fadeUp}
                       key={`${message.chatId}-${message.id}`}
                       onClick={() => { setSelectedChatId(message.chatId); setMainView('chat'); setShowSidebar(false) }}
-                      className="premium-surface w-full rounded-2xl bg-background/70 px-3 py-2 text-left transition-colors hover:-translate-y-px hover:bg-muted"
+                      className="premium-surface w-full rounded-md border border-border bg-background/70 px-3 py-2 text-left transition-colors hover:bg-muted"
                     >
                       <div className="text-xs font-medium">{message.chatTitle}</div>
                       <div className="mt-1 line-clamp-2 text-xs text-muted-foreground">{message.content}</div>
@@ -1846,7 +1906,7 @@ function Workspace({
                         draggable
                         onDragStart={(event: DragEvent<HTMLButtonElement>) => event.dataTransfer.setData('text/plain', chat.id)}
                         onClick={() => { setSelectedChatId(chat.id); setMainView('chat'); setShowSidebar(false) }}
-                        className={joinClasses('premium-surface w-full rounded-2xl bg-background/70 px-3 py-2 text-left transition-colors hover:-translate-y-px hover:bg-muted', selectedChatId === chat.id && 'bg-muted')}
+                        className={joinClasses('premium-surface w-full rounded-md border border-border bg-background/70 px-3 py-2 text-left transition-colors hover:bg-muted', selectedChatId === chat.id && 'bg-muted')}
                       >
                         <div className="flex items-start gap-2">
                           <MessageSquare className="mt-0.5 size-3.5 shrink-0 text-muted-foreground" />
@@ -1868,7 +1928,7 @@ function Workspace({
           </div>
         </aside>
 
-        <main className="flex min-h-0 flex-col rounded-3xl bg-card/75 shadow-sm backdrop-blur-sm">
+        <main className="relative flex min-h-0 flex-col rounded-md border border-border bg-card/75 shadow-sm backdrop-blur-sm">
           <div className="flex flex-col gap-3 px-4 py-3 sm:px-5 sm:py-4 lg:flex-row lg:items-center lg:justify-between">
             <div className="min-w-0">
               {selectedChat ? (
@@ -1902,17 +1962,15 @@ function Workspace({
 
             {selectedChat ? (
               <div className="relative flex flex-wrap items-center gap-1 sm:justify-end">
-                {!showChatSettingsPanel ? (
-                  <Button
-                    variant="ghost"
-                    size="sm"
-                    title="Show chat controls"
-                    onClick={() => setShowChatSettingsPanel(true)}
-                  >
-                    <Settings className="mr-2 size-4" />
-                    Controls
-                  </Button>
-                ) : null}
+                <Button
+                  variant={isSettingsOpen ? 'secondary' : 'outline'}
+                  size="sm"
+                  title="Open settings"
+                  onClick={() => setMainView('settings')}
+                >
+                  <Settings className="mr-2 size-4" />
+                  Settings
+                </Button>
                 <Button
                   variant="outline"
                   size="sm"
@@ -1926,7 +1984,7 @@ function Workspace({
                       {showToolsMenu ? (
                   <motion.div
                     {...fadeScale}
-                    className="absolute right-0 top-full z-20 mt-2 w-72 rounded-2xl bg-popover/95 p-1 shadow-lg backdrop-blur-sm"
+                    className="absolute right-0 top-full z-20 mt-2 w-72 rounded-md border border-border bg-popover/95 p-1 shadow-lg backdrop-blur-sm"
                   >
                     {[
                       {
@@ -2026,304 +2084,10 @@ function Workspace({
             </div>
           ) : null}
 
-          {mainView === 'settings' ? (
-              <div className="flex-1 overflow-visible px-4 py-3 sm:px-5 sm:py-5 lg:min-h-0 lg:overflow-y-auto">
-              <div className="mx-auto max-w-5xl space-y-5">
-                <Card className="shadow-none">
-                  <CardHeader>
-                    <CardTitle className="text-base">Profile</CardTitle>
-                    <CardDescription>App-level profile fields and your public profile URL.</CardDescription>
-                  </CardHeader>
-                  <CardContent className="grid gap-4 md:grid-cols-2">
-                    <div className="grid gap-2">
-                      <label className="text-sm font-medium">Display name</label>
-                      <Input value={profileForm.displayName} onChange={(event) => setProfileForm((current) => ({ ...current, displayName: event.target.value }))} />
-                    </div>
-                    <div className="grid gap-2">
-                      <label className="text-sm font-medium">Public username</label>
-                      <Input value={profileForm.publicUsername} onChange={(event) => setProfileForm((current) => ({ ...current, publicUsername: event.target.value }))} placeholder="your_name" />
-                    </div>
-                    <div className="grid gap-2">
-                      <label className="text-sm font-medium">Profile image URL</label>
-                      <Input value={profileForm.imageUrl} onChange={(event) => setProfileForm((current) => ({ ...current, imageUrl: event.target.value }))} placeholder="https://..." />
-                    </div>
-                    <div className="grid gap-2 md:col-span-2">
-                      <label className="text-sm font-medium">Bio</label>
-                      <Textarea value={profileForm.bio} onChange={(event) => setProfileForm((current) => ({ ...current, bio: event.target.value }))} className="min-h-24" />
-                    </div>
-                    <div className="md:col-span-2 flex flex-wrap items-center justify-between gap-3">
-                      <div className="text-xs text-muted-foreground">
-                        {workspace?.user.publicUsername ? `Public URL: ${window.location.origin}/u/${workspace.user.publicUsername}` : 'Set a public username to publish a profile page.'}
-                      </div>
-                      <div className="flex gap-2">
-                        {workspace?.user.publicUsername ? (
-                          <Button variant="outline" onClick={() => navigateToProfile(workspace.user.publicUsername!)}>Open profile</Button>
-                        ) : null}
-                        <Button disabled={isSavingProfile} onClick={() => saveProfile().catch((error: Error) => setErrorMessage(error.message))}>
-                          {isSavingProfile ? <Loader2 className="mr-2 size-4 animate-spin" /> : null}
-                          Save profile
-                        </Button>
-                      </div>
-                    </div>
-                  </CardContent>
-                </Card>
-
-                <Card className="shadow-none">
-                  <CardHeader>
-                    <CardTitle className="text-base">Defaults and memory</CardTitle>
-                  </CardHeader>
-                  <CardContent className="grid gap-4 md:grid-cols-2">
-                    <div className="grid gap-2">
-                      <label className="text-sm font-medium">Roast level</label>
-                      <select className="h-9 border border-input bg-transparent px-3 text-sm" value={preferenceForm.roastLevel} onChange={(event) => setPreferenceForm((current) => ({ ...current, roastLevel: event.target.value as PreferenceRecord['roastLevel'] }))}>
-                        <option value="light">Light</option>
-                        <option value="medium">Medium</option>
-                        <option value="high">High</option>
-                      </select>
-                    </div>
-                    <div className="grid gap-2">
-                      <label className="text-sm font-medium">Response length</label>
-                      <select className="h-9 border border-input bg-transparent px-3 text-sm" value={preferenceForm.responseLength} onChange={(event) => setPreferenceForm((current) => ({ ...current, responseLength: event.target.value as PreferenceRecord['responseLength'] }))}>
-                        <option value="short">Short</option>
-                        <option value="medium">Medium</option>
-                        <option value="long">Long</option>
-                      </select>
-                    </div>
-                    <div className="grid gap-2">
-                      <label className="text-sm font-medium">Format</label>
-                      <select className="h-9 border border-input bg-transparent px-3 text-sm" value={preferenceForm.outputFormat} onChange={(event) => setPreferenceForm((current) => ({ ...current, outputFormat: event.target.value as PreferenceRecord['outputFormat'] }))}>
-                        <option value="bullets">Bullets</option>
-                        <option value="paragraphs">Paragraphs</option>
-                      </select>
-                    </div>
-                    <div className="grid gap-2">
-                      <label className="text-sm font-medium">Answer mode</label>
-                      <select className="h-9 border border-input bg-transparent px-3 text-sm" value={preferenceForm.answerMode} onChange={(event) => setPreferenceForm((current) => ({ ...current, answerMode: event.target.value as PreferenceRecord['answerMode'] }))}>
-                        <option value="fast">Fast</option>
-                        <option value="balanced">Balanced</option>
-                        <option value="deep">Deep research</option>
-                      </select>
-                    </div>
-                    <div className="grid gap-2">
-                      <label className="text-sm font-medium">Model</label>
-                      <select className="h-9 border border-input bg-transparent px-3 text-sm" value={preferenceForm.preferredModel} onChange={(event) => setPreferenceForm((current) => ({ ...current, preferredModel: event.target.value }))}>
-                        {MODEL_OPTIONS.map((model) => <option key={model} value={model}>{model}</option>)}
-                      </select>
-                    </div>
-                    <div className="grid gap-2">
-                      <label className="text-sm font-medium">Default folder</label>
-                      <select className="h-9 border border-input bg-transparent px-3 text-sm" value={preferenceForm.defaultFolderId ?? 'none'} onChange={(event) => setPreferenceForm((current) => ({ ...current, defaultFolderId: event.target.value === 'none' ? null : event.target.value }))}>
-                        <option value="none">None</option>
-                        {folders.map((folder) => <option key={folder.id} value={folder.id}>{folder.name}</option>)}
-                      </select>
-                    </div>
-                    <label className="flex items-center gap-3 border border-border px-3 py-3 text-sm md:col-span-2">
-                      <input type="checkbox" checked={preferenceForm.onlyFromSources} onChange={(event) => setPreferenceForm((current) => ({ ...current, onlyFromSources: event.target.checked }))} />
-                      Only answer from sources by default
-                    </label>
-                    <div className="grid gap-2 md:col-span-2">
-                      <label className="text-sm font-medium">Reusable memory</label>
-                      <Textarea value={preferenceForm.memoryNotes} onChange={(event) => setPreferenceForm((current) => ({ ...current, memoryNotes: event.target.value }))} className="min-h-24" />
-                    </div>
-                    <div className="md:col-span-2 flex justify-end">
-                      <Button disabled={isSavingPreferences} onClick={() => savePreferences().catch((error: Error) => setErrorMessage(error.message))}>
-                        {isSavingPreferences ? <Loader2 className="mr-2 size-4 animate-spin" /> : null}
-                        Save defaults
-                      </Button>
-                    </div>
-                  </CardContent>
-                </Card>
-
-                <Card className="shadow-none">
-                  <CardHeader>
-                    <CardTitle className="text-base">Usage and data</CardTitle>
-                  </CardHeader>
-                  <CardContent className="space-y-4">
-                    <div className="grid gap-4 md:grid-cols-3">
-                      <div className="rounded-2xl bg-background/65 px-4 py-3"><div className="text-xs text-muted-foreground">Sent today</div><div className="mt-1 text-2xl font-semibold">{workspace?.usage.sentToday ?? 0}</div></div>
-                      <div className="rounded-2xl bg-background/65 px-4 py-3"><div className="text-xs text-muted-foreground">Remaining</div><div className="mt-1 text-2xl font-semibold">{workspace?.usage.remainingToday ?? 'Unlimited'}</div></div>
-                      <div className="rounded-2xl bg-background/65 px-4 py-3"><div className="text-xs text-muted-foreground">Recoverable deleted chats</div><div className="mt-1 text-2xl font-semibold">{workspace?.usage.deletedRecoverableCount ?? 0}</div></div>
-                    </div>
-                    <div className="rounded-2xl bg-background/55">
-                      {(workspace?.usage.activity ?? []).slice(0, 10).map((item) => (
-                        <div key={item.id} className="flex items-start justify-between gap-3 px-4 py-3">
-                          <div className="min-w-0">
-                            <div className="text-sm font-medium">{item.type}</div>
-                            <div className="truncate text-xs text-muted-foreground">{JSON.stringify(item.metadata ?? {})}</div>
-                          </div>
-                          <div className="shrink-0 text-xs text-muted-foreground">{timeLabel(item.createdAt)}</div>
-                        </div>
-                      ))}
-                    </div>
-                    <div className="flex flex-wrap justify-end gap-2">
-                      <Button variant="outline" disabled={isExportingData} onClick={() => exportStoredData().catch((error: Error) => setErrorMessage(error.message))}>
-                        {isExportingData ? <Loader2 className="mr-2 size-4 animate-spin" /> : <Download className="mr-2 size-4" />}
-                        Export data
-                      </Button>
-                      <Button variant="destructive" disabled={isDeletingData} onClick={() => deleteStoredData().catch((error: Error) => setErrorMessage(error.message))}>
-                        {isDeletingData ? <Loader2 className="mr-2 size-4 animate-spin" /> : <Trash2 className="mr-2 size-4" />}
-                        Delete stored data
-                      </Button>
-                    </div>
-                  </CardContent>
-                </Card>
-
-                <Card className="shadow-none">
-                  <CardHeader>
-                    <CardTitle className="text-base">Premium</CardTitle>
-                    <CardDescription>Free includes {dailyLimitLabel(workspace?.user.billing.dailyMessageLimit ?? 2)}. Premium raises the daily limit and is enforced entirely from verified server billing state.</CardDescription>
-                  </CardHeader>
-                  <CardContent className="space-y-4">
-                    <div className="grid gap-4 md:grid-cols-3">
-                      <div className="rounded-2xl bg-background/65 px-4 py-3">
-                        <div className="text-xs text-muted-foreground">Plan</div>
-                        <div className="mt-1 text-lg font-semibold">{workspace?.user.billing.planName ?? 'Free'}</div>
-                      </div>
-                      <div className="rounded-2xl bg-background/65 px-4 py-3">
-                        <div className="text-xs text-muted-foreground">Status</div>
-                        <div className="mt-1 text-lg font-semibold capitalize">{workspace?.user.billing.status ?? 'inactive'}</div>
-                      </div>
-                      <div className="rounded-2xl bg-background/65 px-4 py-3">
-                        <div className="text-xs text-muted-foreground">Daily limit</div>
-                        <div className="mt-1 text-lg font-semibold">{dailyLimitLabel(workspace?.user.billing.dailyMessageLimit ?? 2)}</div>
-                      </div>
-                    </div>
-
-                    <div className="grid gap-2 text-sm text-muted-foreground">
-                      <div className="flex items-center justify-between pb-2">
-                        <span>Price</span>
-                        <span>{moneyLabel(workspace?.user.billing.amountPaise ?? 100, workspace?.user.billing.currency ?? 'INR') ?? 'Rs 1 / month'}</span>
-                      </div>
-                      <div className="flex items-center justify-between pb-2">
-                        <span>Renews / access ends</span>
-                        <span>{workspace?.user.billing.renewsAt ? timeLabel(workspace.user.billing.renewsAt) : 'Not subscribed'}</span>
-                      </div>
-                      <div className="flex items-center justify-between">
-                        <span>Subscription ID</span>
-                        <span className="max-w-[220px] truncate">{workspace?.user.billing.razorpaySubscriptionId ?? 'None'}</span>
-                      </div>
-                    </div>
-
-                    {workspace?.user.billing.failureReason ? (
-                      <Alert variant="destructive">
-                        <AlertCircle className="size-4" />
-                        <AlertTitle>Billing attention needed</AlertTitle>
-                        <AlertDescription>{workspace.user.billing.failureReason}</AlertDescription>
-                      </Alert>
-                    ) : null}
-
-                    <div className="flex flex-wrap justify-end gap-2">
-                      {workspace?.user.billing.isPremium ? (
-                        <Button
-                          variant="outline"
-                          disabled={isCancellingSubscription}
-                          onClick={() => cancelPremiumSubscription().catch((error: Error) => setErrorMessage(error.message))}
-                        >
-                          {isCancellingSubscription ? <Loader2 className="mr-2 size-4 animate-spin" /> : null}
-                          Cancel at cycle end
-                        </Button>
-                      ) : (
-                        <Button
-                          disabled={isStartingSubscription}
-                          onClick={() => startPremiumCheckout().catch((error: Error) => setErrorMessage(error.message))}
-                        >
-                          {isStartingSubscription ? <Loader2 className="mr-2 size-4 animate-spin" /> : null}
-                          Upgrade to Premium
-                        </Button>
-                      )}
-                    </div>
-                  </CardContent>
-                </Card>
-              </div>
-            </div>
-          ) : selectedChat ? (
+          {selectedChat ? (
             <>
               <div className="flex-1 overflow-visible lg:min-h-0 lg:overflow-y-auto">
                 <div className="mx-auto flex max-w-5xl flex-col gap-4 px-4 py-3 sm:gap-5 sm:px-5 sm:py-5">
-                  {showChatSettingsPanel ? (
-                    <Card className="shadow-none">
-                      <CardHeader>
-                        <div className="flex items-center justify-between gap-3">
-                          <div>
-                            <CardTitle className="text-base">Chat controls</CardTitle>
-                            <CardDescription>Per-chat behavior, context budget, and answer style.</CardDescription>
-                          </div>
-                          <Button variant="ghost" size="icon-sm" title="Hide chat controls" onClick={() => setShowChatSettingsPanel(false)}>
-                            <X className="size-4" />
-                          </Button>
-                        </div>
-                      </CardHeader>
-                      <CardContent className="grid gap-4 md:grid-cols-2">
-                        <div className="grid gap-2">
-                          <label className="text-sm font-medium">Folder</label>
-                          <select className="h-9 border border-input bg-transparent px-3 text-sm" value={currentFolderId ?? 'none'} onChange={(event) => moveChatToFolder(event.target.value === 'none' ? null : event.target.value).catch((error: Error) => setErrorMessage(error.message))}>
-                            <option value="none">Unfiled</option>
-                            {folders.map((folder) => <option key={folder.id} value={folder.id}>{folder.name}</option>)}
-                          </select>
-                        </div>
-                        <div className="grid gap-2">
-                          <label className="text-sm font-medium">Mode</label>
-                          <select className="h-9 border border-input bg-transparent px-3 text-sm" value={chatSettingsForm.answerMode} onChange={(event) => setChatSettingsForm((current) => ({ ...current, answerMode: event.target.value as ChatSettings['answerMode'] }))}>
-                            <option value="fast">Fast</option>
-                            <option value="balanced">Balanced</option>
-                            <option value="deep">Deep research</option>
-                          </select>
-                        </div>
-                        <div className="grid gap-2">
-                          <label className="text-sm font-medium">Model</label>
-                          <select className="h-9 border border-input bg-transparent px-3 text-sm" value={chatSettingsForm.preferredModel} onChange={(event) => setChatSettingsForm((current) => ({ ...current, preferredModel: event.target.value }))}>
-                            {MODEL_OPTIONS.map((model) => <option key={model} value={model}>{model}</option>)}
-                          </select>
-                        </div>
-                        <div className="grid gap-2">
-                          <label className="text-sm font-medium">Roast level</label>
-                          <select className="h-9 border border-input bg-transparent px-3 text-sm" value={chatSettingsForm.roastLevel} onChange={(event) => setChatSettingsForm((current) => ({ ...current, roastLevel: event.target.value as ChatSettings['roastLevel'] }))}>
-                            <option value="light">Light</option>
-                            <option value="medium">Medium</option>
-                            <option value="high">High</option>
-                          </select>
-                        </div>
-                        <div className="grid gap-2">
-                          <label className="text-sm font-medium">Response length</label>
-                          <select className="h-9 border border-input bg-transparent px-3 text-sm" value={chatSettingsForm.responseLength} onChange={(event) => setChatSettingsForm((current) => ({ ...current, responseLength: event.target.value as ChatSettings['responseLength'] }))}>
-                            <option value="short">Short</option>
-                            <option value="medium">Medium</option>
-                            <option value="long">Long</option>
-                          </select>
-                        </div>
-                        <div className="grid gap-2">
-                          <label className="text-sm font-medium">Output format</label>
-                          <select className="h-9 border border-input bg-transparent px-3 text-sm" value={chatSettingsForm.outputFormat} onChange={(event) => setChatSettingsForm((current) => ({ ...current, outputFormat: event.target.value as ChatSettings['outputFormat'] }))}>
-                            <option value="bullets">Bullets</option>
-                            <option value="paragraphs">Paragraphs</option>
-                          </select>
-                        </div>
-                        <div className="grid gap-2">
-                          <label className="text-sm font-medium">Context budget</label>
-                          <Input type="number" min={4} max={20} value={chatSettingsForm.contextWindow} onChange={(event) => setChatSettingsForm((current) => ({ ...current, contextWindow: Number(event.target.value || 12) }))} />
-                        </div>
-                        <label className="flex items-center gap-3 border border-border px-3 py-3 text-sm">
-                          <input type="checkbox" checked={chatSettingsForm.useWebSearch} onChange={(event) => setChatSettingsForm((current) => ({ ...current, useWebSearch: event.target.checked }))} />
-                          Default web search on
-                        </label>
-                        <label className="flex items-center gap-3 border border-border px-3 py-3 text-sm">
-                          <input type="checkbox" checked={chatSettingsForm.onlyFromSources} onChange={(event) => setChatSettingsForm((current) => ({ ...current, onlyFromSources: event.target.checked }))} />
-                          Only answer from sources
-                        </label>
-                        <div className="grid gap-2 md:col-span-2">
-                          <label className="text-sm font-medium">Per-chat instructions</label>
-                          <Textarea value={chatSettingsForm.systemPrompt} onChange={(event) => setChatSettingsForm((current) => ({ ...current, systemPrompt: event.target.value }))} className="min-h-24" />
-                        </div>
-                        <div className="md:col-span-2 flex justify-end">
-                          <Button disabled={isSavingChatSettings} onClick={() => saveChatSettings().catch((error: Error) => setErrorMessage(error.message))}>
-                            {isSavingChatSettings ? <Loader2 className="mr-2 size-4 animate-spin" /> : null}
-                            Save chat settings
-                          </Button>
-                        </div>
-                      </CardContent>
-                    </Card>
-                  ) : null}
-
                   {selectedChat.summary ? (
                     <Card className="shadow-none">
                       <CardHeader><CardTitle className="text-base">Conversation summary</CardTitle></CardHeader>
@@ -2335,9 +2099,9 @@ function Workspace({
                     {!selectedChat.messages.length ? (
                       <motion.div
                         {...fadeUp}
-                        className="rounded-3xl bg-background/55 px-4 py-6 text-center sm:px-6"
+                        className="rounded-md border border-border bg-background/55 px-4 py-6 text-center sm:px-6"
                       >
-                        <div className="mx-auto mb-3 flex size-10 items-center justify-center rounded-2xl bg-muted">
+                        <div className="mx-auto mb-3 flex size-10 items-center justify-center rounded-md bg-muted">
                           <MessageSquare className="size-4" />
                         </div>
                         <div className="text-sm font-medium">No messages yet</div>
@@ -2351,7 +2115,7 @@ function Workspace({
                         key={message.id}
                         variants={fadeUp}
                         layout
-                        className={joinClasses('premium-surface max-w-4xl overflow-hidden rounded-3xl px-4 py-4', message.role === 'user' ? 'ml-auto bg-muted/80' : 'bg-background/70')}
+                        className={joinClasses('premium-surface max-w-4xl overflow-hidden rounded-md border border-border px-4 py-4', message.role === 'user' ? 'ml-auto bg-muted/80' : 'bg-background/70')}
                       >
                         <div className="mb-3 flex items-center gap-2">
                           <Badge variant={message.role === 'user' ? 'secondary' : 'outline'}>{message.role === 'user' ? 'You' : 'Assistant'}</Badge>
@@ -2361,20 +2125,14 @@ function Workspace({
                           {confidenceLabel(message.confidence) ? <Badge variant="outline">{confidenceLabel(message.confidence)}</Badge> : null}
                         </div>
                         {message.role === 'assistant' ? (
-                          <div
-                            className={joinClasses(
-                              'prose-answer',
-                              isSending && selectedChat.messages.at(-1)?.id === message.id && !message.content && 'streaming-caret',
-                              isSending && selectedChat.messages.at(-1)?.id === message.id && message.content && 'streaming-caret',
-                            )}
-                          >
+                          <div className="prose-answer">
                             <ReactMarkdown remarkPlugins={[remarkGfm]}>{message.content || (isSending && selectedChat.messages.at(-1)?.id === message.id ? 'Thinking...' : '')}</ReactMarkdown>
                           </div>
                         ) : (
                           <p className="whitespace-pre-wrap text-sm leading-7">{message.content}</p>
                         )}
                         {message.contextUsed?.length ? (
-                          <div className="mt-4 rounded-2xl bg-muted/45 px-3 py-3">
+                          <div className="mt-4 rounded-md border border-border bg-muted/45 px-3 py-3">
                             <div className="mb-2 flex items-center gap-2 text-xs font-medium text-muted-foreground">
                               <Sparkles className="size-3.5" />
                               Injected context
@@ -2431,7 +2189,7 @@ function Workspace({
                 <div className="mx-auto max-w-5xl">
                   <AnimatePresence>
                     {showUpgradePrompt ? (
-                      <motion.div {...fadeScale} className="mb-3 rounded-2xl bg-background/75 px-4 py-3 shadow-sm">
+                      <motion.div {...fadeScale} className="mb-3 rounded-md border border-border bg-background/75 px-4 py-3 shadow-sm">
                         <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
                           <div>
                             <div className="text-sm font-medium">You’ve used today’s free messages.</div>
@@ -2476,9 +2234,9 @@ function Workspace({
                   <div className="mt-3 flex flex-col gap-2 sm:flex-row sm:flex-wrap sm:items-center sm:justify-between">
                     <div className="flex flex-col gap-2 text-[11px] text-muted-foreground sm:flex-row sm:flex-wrap sm:items-center sm:gap-3 sm:text-xs">
                       <label className="flex items-center gap-2">
-                        <input type="checkbox" checked={composerUseWebSearch} onChange={(event) => setComposerUseWebSearch(event.target.checked)} />
                         <Globe className="size-3.5" />
-                        Web search for this message
+                        <span>Web search for this message</span>
+                        <Switch checked={composerUseWebSearch} onCheckedChange={setComposerUseWebSearch} ariaLabel="Web search for this message" />
                       </label>
                       <span>
                         {workspace?.usage.remainingToday === null
@@ -2510,7 +2268,7 @@ function Workspace({
           ) : (
             <div className="flex flex-1 items-center justify-center px-6">
               <div className="max-w-md text-center">
-                <div className="mx-auto mb-4 flex size-12 items-center justify-center rounded-2xl bg-muted"><MessageSquare className="size-5" /></div>
+                <div className="mx-auto mb-4 flex size-12 items-center justify-center rounded-md bg-muted"><MessageSquare className="size-5" /></div>
                 <h3 className="text-xl font-semibold tracking-tight">Start something useful</h3>
                 <p className="mt-2 text-sm leading-6 text-muted-foreground">Create a chat, keep context, and stop losing threads to product entropy.</p>
                 <div className="mt-6">
@@ -2522,6 +2280,334 @@ function Workspace({
               </div>
             </div>
           )}
+
+          <AnimatePresence>
+            {isSettingsOpen ? (
+              <>
+                <motion.button
+                  type="button"
+                  aria-label="Close settings"
+                  className="absolute inset-0 z-30 bg-background/70"
+                  onClick={() => setMainView('chat')}
+                />
+                <motion.div
+                  {...fadeScale}
+                  className="absolute inset-0 z-40 flex items-start justify-center p-3 sm:p-6"
+                >
+                  <Card className="flex max-h-[calc(100dvh-1.5rem)] w-full max-w-3xl flex-col rounded-md border-border bg-card shadow-2xl sm:max-h-[calc(100dvh-3rem)]">
+                    <CardHeader className="border-b border-border">
+                      <div className="flex items-start justify-between gap-4">
+                        <div>
+                          <CardTitle className="text-base">Settings</CardTitle>
+                          <CardDescription className="mt-1">
+                            Account, reply defaults, current chat behavior, and billing in one place.
+                          </CardDescription>
+                        </div>
+                        <Button variant="ghost" size="icon-sm" title="Close settings" onClick={() => setMainView('chat')}>
+                          <X className="size-4" />
+                        </Button>
+                      </div>
+                    </CardHeader>
+                    <CardContent className="flex-1 overflow-y-auto px-0">
+                      <div className="space-y-6 p-4 sm:p-5">
+                        <section className="space-y-4">
+                          <div>
+                            <h3 className="text-sm font-medium">Profile</h3>
+                            <p className="mt-1 text-xs text-muted-foreground">Manage your public identity and profile details.</p>
+                          </div>
+                          <div className="grid gap-4 md:grid-cols-2">
+                            <div className="grid gap-2">
+                              <label className="text-sm font-medium">Display name</label>
+                              <Input value={profileForm.displayName} onChange={(event) => setProfileForm((current) => ({ ...current, displayName: event.target.value }))} />
+                            </div>
+                            <div className="grid gap-2">
+                              <label className="text-sm font-medium">Public username</label>
+                              <Input value={profileForm.publicUsername} onChange={(event) => setProfileForm((current) => ({ ...current, publicUsername: event.target.value }))} placeholder="your_name" />
+                            </div>
+                            <div className="grid gap-2">
+                              <label className="text-sm font-medium">Profile image URL</label>
+                              <Input value={profileForm.imageUrl} onChange={(event) => setProfileForm((current) => ({ ...current, imageUrl: event.target.value }))} placeholder="https://..." />
+                            </div>
+                            <div className="grid gap-2 md:col-span-2">
+                              <label className="text-sm font-medium">Bio</label>
+                              <Textarea value={profileForm.bio} onChange={(event) => setProfileForm((current) => ({ ...current, bio: event.target.value }))} className="min-h-24" />
+                            </div>
+                            <div className="md:col-span-2 flex flex-wrap items-center justify-between gap-3 border border-border bg-background/50 px-3 py-3 text-xs text-muted-foreground">
+                              <div>
+                                {workspace?.user.publicUsername ? `Public URL: ${window.location.origin}/u/${workspace.user.publicUsername}` : 'Set a public username to publish a profile page.'}
+                              </div>
+                              <div className="flex gap-2">
+                                {workspace?.user.publicUsername ? (
+                                  <Button variant="outline" onClick={() => navigateToProfile(workspace.user.publicUsername!)}>Open profile</Button>
+                                ) : null}
+                                <Button disabled={isSavingProfile} onClick={() => saveProfile().catch((error: Error) => setErrorMessage(error.message))}>
+                                  {isSavingProfile ? <Loader2 className="mr-2 size-4 animate-spin" /> : null}
+                                  Save profile
+                                </Button>
+                              </div>
+                            </div>
+                          </div>
+                        </section>
+
+                        <Separator />
+
+                        <section className="space-y-4">
+                          <div>
+                            <h3 className="text-sm font-medium">Defaults</h3>
+                            <p className="mt-1 text-xs text-muted-foreground">Set how new chats should behave before you start typing.</p>
+                          </div>
+                          <div className="grid gap-4 md:grid-cols-2">
+                            <div className="grid gap-2">
+                              <label className="text-sm font-medium">Roast level</label>
+                              <Select value={preferenceForm.roastLevel} onChange={(event) => setPreferenceForm((current) => ({ ...current, roastLevel: event.target.value as PreferenceRecord['roastLevel'] }))}>
+                                <option value="light">Light</option>
+                                <option value="medium">Medium</option>
+                                <option value="high">High</option>
+                              </Select>
+                            </div>
+                            <div className="grid gap-2">
+                              <label className="text-sm font-medium">Response length</label>
+                              <Select value={preferenceForm.responseLength} onChange={(event) => setPreferenceForm((current) => ({ ...current, responseLength: event.target.value as PreferenceRecord['responseLength'] }))}>
+                                <option value="short">Short</option>
+                                <option value="medium">Medium</option>
+                                <option value="long">Long</option>
+                              </Select>
+                            </div>
+                            <div className="grid gap-2">
+                              <label className="text-sm font-medium">Format</label>
+                              <Select value={preferenceForm.outputFormat} onChange={(event) => setPreferenceForm((current) => ({ ...current, outputFormat: event.target.value as PreferenceRecord['outputFormat'] }))}>
+                                <option value="bullets">Bullets</option>
+                                <option value="paragraphs">Paragraphs</option>
+                              </Select>
+                            </div>
+                            <div className="grid gap-2">
+                              <label className="text-sm font-medium">Answer mode</label>
+                              <Select value={preferenceForm.answerMode} onChange={(event) => setPreferenceForm((current) => ({ ...current, answerMode: event.target.value as PreferenceRecord['answerMode'] }))}>
+                                <option value="fast">Fast</option>
+                                <option value="balanced">Balanced</option>
+                                <option value="deep">Deep research</option>
+                              </Select>
+                            </div>
+                            <div className="grid gap-2">
+                              <label className="text-sm font-medium">Model</label>
+                              <Select value={preferenceForm.preferredModel} onChange={(event) => setPreferenceForm((current) => ({ ...current, preferredModel: event.target.value }))}>
+                                {MODEL_OPTIONS.map((model) => <option key={model} value={model}>{model}</option>)}
+                              </Select>
+                            </div>
+                            <div className="grid gap-2">
+                              <label className="text-sm font-medium">Default folder</label>
+                              <Select value={preferenceForm.defaultFolderId ?? 'none'} onChange={(event) => setPreferenceForm((current) => ({ ...current, defaultFolderId: event.target.value === 'none' ? null : event.target.value }))}>
+                                <option value="none">None</option>
+                                {folders.map((folder) => <option key={folder.id} value={folder.id}>{folder.name}</option>)}
+                              </Select>
+                            </div>
+                            <label className="flex items-center justify-between gap-3 border border-border bg-background/50 px-3 py-3 text-sm md:col-span-2">
+                              <span>Only answer from sources by default</span>
+                              <Switch checked={preferenceForm.onlyFromSources} onCheckedChange={(checked) => setPreferenceForm((current) => ({ ...current, onlyFromSources: checked }))} ariaLabel="Only answer from sources by default" />
+                            </label>
+                            <div className="grid gap-2 md:col-span-2">
+                              <label className="text-sm font-medium">Reusable memory</label>
+                              <Textarea value={preferenceForm.memoryNotes} onChange={(event) => setPreferenceForm((current) => ({ ...current, memoryNotes: event.target.value }))} className="min-h-24" />
+                            </div>
+                            <div className="md:col-span-2 flex justify-end">
+                              <Button disabled={isSavingPreferences} onClick={() => savePreferences().catch((error: Error) => setErrorMessage(error.message))}>
+                                {isSavingPreferences ? <Loader2 className="mr-2 size-4 animate-spin" /> : null}
+                                Save defaults
+                              </Button>
+                            </div>
+                          </div>
+                        </section>
+
+                        <Separator />
+
+                        <section className="space-y-4">
+                          <div>
+                            <h3 className="text-sm font-medium">Current chat</h3>
+                            <p className="mt-1 text-xs text-muted-foreground">These settings apply only to the chat you have open right now.</p>
+                          </div>
+                          {selectedChat ? (
+                            <div className="grid gap-4 md:grid-cols-2">
+                              <div className="grid gap-2">
+                                <label className="text-sm font-medium">Folder</label>
+                                <Select value={currentFolderId ?? 'none'} onChange={(event) => moveChatToFolder(event.target.value === 'none' ? null : event.target.value).catch((error: Error) => setErrorMessage(error.message))}>
+                                  <option value="none">Unfiled</option>
+                                  {folders.map((folder) => <option key={folder.id} value={folder.id}>{folder.name}</option>)}
+                                </Select>
+                              </div>
+                              <div className="grid gap-2">
+                                <label className="text-sm font-medium">Mode</label>
+                                <Select value={chatSettingsForm.answerMode} onChange={(event) => setChatSettingsForm((current) => ({ ...current, answerMode: event.target.value as ChatSettings['answerMode'] }))}>
+                                  <option value="fast">Fast</option>
+                                  <option value="balanced">Balanced</option>
+                                  <option value="deep">Deep research</option>
+                                </Select>
+                              </div>
+                              <div className="grid gap-2">
+                                <label className="text-sm font-medium">Model</label>
+                                <Select value={chatSettingsForm.preferredModel} onChange={(event) => setChatSettingsForm((current) => ({ ...current, preferredModel: event.target.value }))}>
+                                  {MODEL_OPTIONS.map((model) => <option key={model} value={model}>{model}</option>)}
+                                </Select>
+                              </div>
+                              <div className="grid gap-2">
+                                <label className="text-sm font-medium">Roast level</label>
+                                <Select value={chatSettingsForm.roastLevel} onChange={(event) => setChatSettingsForm((current) => ({ ...current, roastLevel: event.target.value as ChatSettings['roastLevel'] }))}>
+                                  <option value="light">Light</option>
+                                  <option value="medium">Medium</option>
+                                  <option value="high">High</option>
+                                </Select>
+                              </div>
+                              <div className="grid gap-2">
+                                <label className="text-sm font-medium">Response length</label>
+                                <Select value={chatSettingsForm.responseLength} onChange={(event) => setChatSettingsForm((current) => ({ ...current, responseLength: event.target.value as ChatSettings['responseLength'] }))}>
+                                  <option value="short">Short</option>
+                                  <option value="medium">Medium</option>
+                                  <option value="long">Long</option>
+                                </Select>
+                              </div>
+                              <div className="grid gap-2">
+                                <label className="text-sm font-medium">Output format</label>
+                                <Select value={chatSettingsForm.outputFormat} onChange={(event) => setChatSettingsForm((current) => ({ ...current, outputFormat: event.target.value as ChatSettings['outputFormat'] }))}>
+                                  <option value="bullets">Bullets</option>
+                                  <option value="paragraphs">Paragraphs</option>
+                                </Select>
+                              </div>
+                              <div className="grid gap-2">
+                                <label className="text-sm font-medium">Context budget</label>
+                                <Input type="number" min={4} max={20} value={chatSettingsForm.contextWindow} onChange={(event) => setChatSettingsForm((current) => ({ ...current, contextWindow: Number(event.target.value || 12) }))} />
+                              </div>
+                              <label className="flex items-center justify-between gap-3 border border-border bg-background/50 px-3 py-3 text-sm">
+                                <span>Default web search on</span>
+                                <Switch checked={chatSettingsForm.useWebSearch} onCheckedChange={(checked) => setChatSettingsForm((current) => ({ ...current, useWebSearch: checked }))} ariaLabel="Default web search on" />
+                              </label>
+                              <label className="flex items-center justify-between gap-3 border border-border bg-background/50 px-3 py-3 text-sm">
+                                <span>Only answer from sources</span>
+                                <Switch checked={chatSettingsForm.onlyFromSources} onCheckedChange={(checked) => setChatSettingsForm((current) => ({ ...current, onlyFromSources: checked }))} ariaLabel="Only answer from sources" />
+                              </label>
+                              <div className="grid gap-2 md:col-span-2">
+                                <label className="text-sm font-medium">Per-chat instructions</label>
+                                <Textarea value={chatSettingsForm.systemPrompt} onChange={(event) => setChatSettingsForm((current) => ({ ...current, systemPrompt: event.target.value }))} className="min-h-24" />
+                              </div>
+                              <div className="md:col-span-2 flex justify-end">
+                                <Button disabled={isSavingChatSettings} onClick={() => saveChatSettings().catch((error: Error) => setErrorMessage(error.message))}>
+                                  {isSavingChatSettings ? <Loader2 className="mr-2 size-4 animate-spin" /> : null}
+                                  Save chat settings
+                                </Button>
+                              </div>
+                            </div>
+                          ) : (
+                            <div className="border border-border bg-background/50 px-3 py-3 text-sm text-muted-foreground">
+                              Open a chat first. Then its per-chat controls will show up here.
+                            </div>
+                          )}
+                        </section>
+
+                        <Separator />
+
+                        <section className="space-y-4">
+                          <div>
+                            <h3 className="text-sm font-medium">Usage and data</h3>
+                            <p className="mt-1 text-xs text-muted-foreground">Track your quota and manage the data we store for your workspace.</p>
+                          </div>
+                          <div className="grid gap-4 md:grid-cols-3">
+                            <div className="border border-border bg-background/50 px-4 py-3"><div className="text-xs text-muted-foreground">Sent today</div><div className="mt-1 text-2xl font-semibold">{workspace?.usage.sentToday ?? 0}</div></div>
+                            <div className="border border-border bg-background/50 px-4 py-3"><div className="text-xs text-muted-foreground">Remaining</div><div className="mt-1 text-2xl font-semibold">{workspace?.usage.remainingToday ?? 'Unlimited'}</div></div>
+                            <div className="border border-border bg-background/50 px-4 py-3"><div className="text-xs text-muted-foreground">Recoverable deleted chats</div><div className="mt-1 text-2xl font-semibold">{workspace?.usage.deletedRecoverableCount ?? 0}</div></div>
+                          </div>
+                          <div className="border border-border bg-background/50">
+                            {(workspace?.usage.activity ?? []).slice(0, 10).map((item, index) => (
+                              <div key={item.id} className={joinClasses('flex items-start justify-between gap-3 px-4 py-3', index > 0 && 'border-t border-border')}>
+                                <div className="min-w-0">
+                                  <div className="text-sm font-medium">{item.type}</div>
+                                  <div className="truncate text-xs text-muted-foreground">{JSON.stringify(item.metadata ?? {})}</div>
+                                </div>
+                                <div className="shrink-0 text-xs text-muted-foreground">{timeLabel(item.createdAt)}</div>
+                              </div>
+                            ))}
+                          </div>
+                          <div className="flex flex-wrap justify-end gap-2">
+                            <Button variant="outline" disabled={isExportingData} onClick={() => exportStoredData().catch((error: Error) => setErrorMessage(error.message))}>
+                              {isExportingData ? <Loader2 className="mr-2 size-4 animate-spin" /> : <Download className="mr-2 size-4" />}
+                              Export data
+                            </Button>
+                            <Button variant="destructive" disabled={isDeletingData} onClick={() => deleteStoredData().catch((error: Error) => setErrorMessage(error.message))}>
+                              {isDeletingData ? <Loader2 className="mr-2 size-4 animate-spin" /> : <Trash2 className="mr-2 size-4" />}
+                              Delete stored data
+                            </Button>
+                          </div>
+                        </section>
+
+                        <Separator />
+
+                        <section className="space-y-4">
+                          <div>
+                            <h3 className="text-sm font-medium">Premium</h3>
+                            <p className="mt-1 text-xs text-muted-foreground">
+                              Free includes {dailyLimitLabel(workspace?.user.billing.dailyMessageLimit ?? 2)}. Premium raises the daily limit and stays tied to verified server billing state.
+                            </p>
+                          </div>
+                          <div className="grid gap-4 md:grid-cols-3">
+                            <div className="border border-border bg-background/50 px-4 py-3">
+                              <div className="text-xs text-muted-foreground">Plan</div>
+                              <div className="mt-1 text-lg font-semibold">{workspace?.user.billing.planName ?? 'Free'}</div>
+                            </div>
+                            <div className="border border-border bg-background/50 px-4 py-3">
+                              <div className="text-xs text-muted-foreground">Status</div>
+                              <div className="mt-1 text-lg font-semibold capitalize">{workspace?.user.billing.status ?? 'inactive'}</div>
+                            </div>
+                            <div className="border border-border bg-background/50 px-4 py-3">
+                              <div className="text-xs text-muted-foreground">Daily limit</div>
+                              <div className="mt-1 text-lg font-semibold">{dailyLimitLabel(workspace?.user.billing.dailyMessageLimit ?? 2)}</div>
+                            </div>
+                          </div>
+                          <div className="grid gap-2 text-sm text-muted-foreground">
+                            <div className="flex items-center justify-between border-b border-border pb-2">
+                              <span>Price</span>
+                              <span>{moneyLabel(workspace?.user.billing.amountPaise ?? 100, workspace?.user.billing.currency ?? 'INR') ?? 'Rs 1 / month'}</span>
+                            </div>
+                            <div className="flex items-center justify-between border-b border-border pb-2">
+                              <span>Renews / access ends</span>
+                              <span>{workspace?.user.billing.renewsAt ? timeLabel(workspace.user.billing.renewsAt) : 'Not subscribed'}</span>
+                            </div>
+                            <div className="flex items-center justify-between">
+                              <span>Subscription ID</span>
+                              <span className="max-w-[220px] truncate">{workspace?.user.billing.razorpaySubscriptionId ?? 'None'}</span>
+                            </div>
+                          </div>
+                          {workspace?.user.billing.failureReason ? (
+                            <Alert variant="destructive">
+                              <AlertCircle className="size-4" />
+                              <AlertTitle>Billing attention needed</AlertTitle>
+                              <AlertDescription>{workspace.user.billing.failureReason}</AlertDescription>
+                            </Alert>
+                          ) : null}
+                          <div className="flex flex-wrap justify-end gap-2">
+                            {workspace?.user.billing.isPremium ? (
+                              <Button
+                                variant="outline"
+                                disabled={isCancellingSubscription}
+                                onClick={() => cancelPremiumSubscription().catch((error: Error) => setErrorMessage(error.message))}
+                              >
+                                {isCancellingSubscription ? <Loader2 className="mr-2 size-4 animate-spin" /> : null}
+                                Cancel at cycle end
+                              </Button>
+                            ) : (
+                              <Button
+                                disabled={isStartingSubscription}
+                                onClick={() => startPremiumCheckout().catch((error: Error) => setErrorMessage(error.message))}
+                              >
+                                {isStartingSubscription ? <Loader2 className="mr-2 size-4 animate-spin" /> : null}
+                                Upgrade to Premium
+                              </Button>
+                            )}
+                          </div>
+                        </section>
+                      </div>
+                    </CardContent>
+                  </Card>
+                </motion.div>
+              </>
+            ) : null}
+          </AnimatePresence>
         </main>
       </div>
     </div>
@@ -2530,17 +2616,24 @@ function Workspace({
 
 export default function App() {
   const { isLoaded, userId } = useAuth()
-  const [theme] = useState<ThemeMode>('dark')
+  const [theme, setTheme] = useState<ThemeMode>('dark')
   const [route, setRoute] = useState<RouteState>(() => parseRoute(window.location.pathname))
 
   useEffect(() => {
-    document.documentElement.classList.add('dark')
+    const saved = (window.localStorage.getItem('poorplexity-theme') as ThemeMode | null) ?? 'dark'
+    setTheme(saved)
+    document.documentElement.classList.toggle('dark', saved === 'dark')
     const onPopState = () => setRoute(parseRoute(window.location.pathname))
     window.addEventListener('popstate', onPopState)
     return () => window.removeEventListener('popstate', onPopState)
   }, [])
 
-  const toggleTheme = () => {}
+  const toggleTheme = () => {
+    const next = theme === 'dark' ? 'light' : 'dark'
+    setTheme(next)
+    document.documentElement.classList.toggle('dark', next === 'dark')
+    window.localStorage.setItem('poorplexity-theme', next)
+  }
 
   const navigateToProfile = (username: string) => {
     window.history.pushState({}, '', `/u/${username}`)

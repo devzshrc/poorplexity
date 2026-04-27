@@ -29,7 +29,7 @@ export async function authenticateRequest(request: Request): Promise<AuthContext
   });
 
   if (!requestState.isAuthenticated) {
-    throw new Error(requestState.message || requestState.reason || "Unauthorized");
+    throw new Error("Unauthorized");
   }
 
   const auth = requestState.toAuth();

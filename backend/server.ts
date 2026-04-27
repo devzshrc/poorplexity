@@ -29,6 +29,7 @@ const [
     searchWorkspace,
     softDeleteChat,
     syncUser,
+    attachBillingWebhookEventUser,
     updateChat,
     updateUserPreferences,
     updateUserProfile,
@@ -67,6 +68,50 @@ function json(data: unknown, status = 200, headers?: HeadersInit): Response {
 
 function pathMatch(pathname: string, pattern: RegExp) {
   return pathname.match(pattern);
+}
+
+function toPublicError(error: unknown) {
+  const message = error instanceof Error ? error.message : String(error);
+  const normalized = message.toLowerCase();
+
+  if (normalized.includes("unauthorized")) {
+    return { status: 401, message: "Unauthorized" };
+  }
+  if (normalized.includes("not found")) {
+    return { status: 404, message };
+  }
+  if (normalized.includes("origin not allowed")) {
+    return { status: 403, message };
+  }
+  if (normalized.includes("limit")) {
+    return { status: 429, message };
+  }
+  if (normalized.includes("billing is not configured")) {
+    return { status: 503, message };
+  }
+  if (
+    error instanceof SyntaxError
+    || normalized.includes("json")
+    || normalized.includes("unexpected token")
+    || normalized.includes("unexpected end of json")
+  ) {
+    return { status: 400, message: "Invalid JSON body" };
+  }
+  if (
+    normalized.includes("invalid")
+    || normalized.includes("required")
+    || normalized.includes("too long")
+    || normalized.includes("unsupported")
+    || normalized.includes("must ")
+    || normalized.includes("cannot")
+    || normalized.includes("taken")
+    || normalized.includes("mismatch")
+  ) {
+    return { status: 400, message };
+  }
+
+  console.error("[server-error]", error);
+  return { status: 500, message: "Internal server error" };
 }
 
 async function readJson<T>(req: Request): Promise<T> {
@@ -211,11 +256,13 @@ Bun.serve({
         const event = parseWebhookEvent(rawBody);
         const extracted = extractSubscriptionFromWebhook(event);
         const subscriptionId = extracted.subscription?.id ?? null;
+        const notedClerkUserId = extracted.subscription?.notes?.clerk_user_id ?? null;
 
         const duplicate = await recordBillingWebhookEvent({
           eventId,
           eventType: event.event,
           razorpaySubscriptionId: subscriptionId,
+          clerkUserId: notedClerkUserId,
         });
         if (duplicate.duplicate) {
           return new Response(null, { status: 200, headers });
@@ -224,10 +271,11 @@ Bun.serve({
         if (subscriptionId) {
           const linkedUser = await findBillingUserBySubscriptionId(subscriptionId);
           const clerkUserId = linkedUser?.clerkUserId
-            ?? extracted.subscription?.notes?.clerk_user_id
+            ?? notedClerkUserId
             ?? null;
 
           if (clerkUserId) {
+            await attachBillingWebhookEventUser(eventId, clerkUserId);
             const snapshot = await fetchSubscription(subscriptionId).catch(() => extracted.subscription);
             if (snapshot) {
               await applySubscriptionSnapshot({
@@ -478,6 +526,9 @@ Bun.serve({
       if (pathname === "/api/search" && req.method === "GET") {
         const { auth } = await requireUser(req);
         const query = url.searchParams.get("q")?.trim() || "";
+        if (query.length > 200) {
+          return json({ error: "Search query is too long" }, 400, headers);
+        }
         return json(await searchWorkspace(auth.userId, query), 200, headers);
       }
 
@@ -597,6 +648,9 @@ Bun.serve({
         if (!body.messageId || !content) {
           return json({ error: "messageId and content are required" }, 400, headers);
         }
+        if (content.length > 4000) {
+          return json({ error: "content too long" }, 400, headers);
+        }
 
         const chat = await rewriteChatFromMessage(auth.userId, editMessageMatch[1], body.messageId, content);
         return json({ chat }, 200, headers);
@@ -628,6 +682,9 @@ Bun.serve({
 
         if (!content) return json({ error: "content is required" }, 400, headers);
         if (content.length > 4000) return json({ error: "content too long" }, 400, headers);
+        if (body.useWebSearch !== undefined && typeof body.useWebSearch !== "boolean") {
+          return json({ error: "useWebSearch must be a boolean" }, 400, headers);
+        }
 
         const entitlement = await getMessageEntitlement(auth.userId);
         if (entitlement.dailyLimit !== null && entitlement.sentToday >= entitlement.dailyLimit) {
@@ -663,15 +720,8 @@ Bun.serve({
 
       return json({ error: "Not found" }, 404, headers);
     } catch (error) {
-      const message = error instanceof Error ? error.message : String(error);
-      const status = /Unauthorized/i.test(message)
-        ? 401
-        : /not found/i.test(message)
-          ? 404
-          : /limit/i.test(message)
-            ? 429
-            : 400;
-      return json({ error: message }, status, headers);
+      const publicError = toPublicError(error);
+      return json({ error: publicError.message }, publicError.status, headers);
     }
   },
 });

@@ -3,6 +3,8 @@
 @import "shadcn/tailwind.css";
 @import "@fontsource-variable/geist";
 
+@custom-variant dark (&:is(.dark *));
+
 @theme inline {
     --font-heading: var(--font-sans);
     --font-sans: 'Geist Variable', sans-serif;
@@ -46,40 +48,73 @@
     --radius-4xl: calc(var(--radius) * 2.6);
 }
 
-:root,
-.dark {
-    --background: oklch(0 0 0);
-    --foreground: oklch(0.96 0 0);
-    --card: oklch(0.08 0 0);
-    --card-foreground: oklch(0.96 0 0);
-    --popover: oklch(0.08 0 0);
-    --popover-foreground: oklch(0.96 0 0);
-    --primary: oklch(0.96 0 0);
-    --primary-foreground: oklch(0 0 0);
-    --secondary: oklch(0.12 0 0);
-    --secondary-foreground: oklch(0.96 0 0);
-    --muted: oklch(0.11 0 0);
-    --muted-foreground: oklch(0.68 0 0);
-    --accent: oklch(0.14 0 0);
-    --accent-foreground: oklch(0.96 0 0);
+:root {
+    --background: oklch(0.985 0.008 300);
+    --foreground: oklch(0.21 0.015 300);
+    --card: oklch(1 0 0);
+    --card-foreground: oklch(0.21 0.015 300);
+    --popover: oklch(1 0 0);
+    --popover-foreground: oklch(0.21 0.015 300);
+    --primary: oklch(0.58 0.24 300);
+    --primary-foreground: oklch(0.98 0.01 300);
+    --secondary: oklch(0.95 0.025 300);
+    --secondary-foreground: oklch(0.28 0.03 300);
+    --muted: oklch(0.965 0.012 300);
+    --muted-foreground: oklch(0.48 0.018 300);
+    --accent: oklch(0.94 0.03 300);
+    --accent-foreground: oklch(0.28 0.03 300);
     --destructive: oklch(0.62 0.18 26);
-    --border: transparent;
-    --input: transparent;
-    --ring: oklch(0.32 0 0);
-    --chart-1: oklch(0.74 0 0);
-    --chart-2: oklch(0.58 0 0);
-    --chart-3: oklch(0.42 0 0);
-    --chart-4: oklch(0.3 0 0);
-    --chart-5: oklch(0.2 0 0);
+    --border: oklch(0.9 0.012 300);
+    --input: oklch(0.9 0.012 300);
+    --ring: oklch(0.58 0.14 300);
+    --chart-1: oklch(0.62 0.22 300);
+    --chart-2: oklch(0.54 0.18 286);
+    --chart-3: oklch(0.46 0.14 315);
+    --chart-4: oklch(0.38 0.09 300);
+    --chart-5: oklch(0.3 0.06 304);
     --radius: 0.9rem;
-    --sidebar: oklch(0.04 0 0);
-    --sidebar-foreground: oklch(0.96 0 0);
-    --sidebar-primary: oklch(0.96 0 0);
-    --sidebar-primary-foreground: oklch(0 0 0);
-    --sidebar-accent: oklch(0.12 0 0);
-    --sidebar-accent-foreground: oklch(0.96 0 0);
-    --sidebar-border: transparent;
-    --sidebar-ring: oklch(0.32 0 0);
+    --sidebar: oklch(0.975 0.008 300);
+    --sidebar-foreground: oklch(0.21 0.015 300);
+    --sidebar-primary: oklch(0.58 0.24 300);
+    --sidebar-primary-foreground: oklch(0.98 0.01 300);
+    --sidebar-accent: oklch(0.95 0.02 300);
+    --sidebar-accent-foreground: oklch(0.28 0.03 300);
+    --sidebar-border: oklch(0.9 0.012 300);
+    --sidebar-ring: oklch(0.58 0.14 300);
+}
+
+.dark {
+    --background: oklch(0.17 0.008 285);
+    --foreground: oklch(0.94 0.008 285);
+    --card: oklch(0.21 0.01 285);
+    --card-foreground: oklch(0.94 0.008 285);
+    --popover: oklch(0.21 0.01 285);
+    --popover-foreground: oklch(0.94 0.008 285);
+    --primary: oklch(0.67 0.21 300);
+    --primary-foreground: oklch(0.97 0.008 300);
+    --secondary: oklch(0.26 0.012 285);
+    --secondary-foreground: oklch(0.94 0.008 285);
+    --muted: oklch(0.24 0.01 285);
+    --muted-foreground: oklch(0.72 0.01 285);
+    --accent: oklch(0.3 0.03 292);
+    --accent-foreground: oklch(0.96 0.008 285);
+    --destructive: oklch(0.68 0.19 28);
+    --border: oklch(0.31 0.008 285);
+    --input: oklch(0.31 0.008 285);
+    --ring: oklch(0.5 0.08 296);
+    --chart-1: oklch(0.68 0.2 300);
+    --chart-2: oklch(0.58 0.16 286);
+    --chart-3: oklch(0.5 0.12 315);
+    --chart-4: oklch(0.41 0.08 300);
+    --chart-5: oklch(0.33 0.05 304);
+    --sidebar: oklch(0.19 0.009 285);
+    --sidebar-foreground: oklch(0.94 0.008 285);
+    --sidebar-primary: oklch(0.67 0.21 300);
+    --sidebar-primary-foreground: oklch(0.97 0.008 300);
+    --sidebar-accent: oklch(0.25 0.012 285);
+    --sidebar-accent-foreground: oklch(0.94 0.008 285);
+    --sidebar-border: oklch(0.31 0.008 285);
+    --sidebar-ring: oklch(0.5 0.08 296);
 }
 
 @theme inline {
@@ -222,15 +257,4 @@
 
 .mobile-composer {
   padding-bottom: calc(0.75rem + env(safe-area-inset-bottom, 0px));
-}
-
-.streaming-caret::after {
-  content: "";
-  display: inline-block;
-  width: 0.55ch;
-  height: 1.05em;
-  margin-left: 0.2rem;
-  vertical-align: -0.15em;
-  background: var(--primary);
-  animation: blink 1s step-end infinite;
 }
