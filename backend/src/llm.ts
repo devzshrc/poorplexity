@@ -30,8 +30,29 @@ function sanitizeModel(model?: string) {
 
 function formatInstruction(outputFormat: AnswerOptions["outputFormat"]) {
   return outputFormat === "paragraphs"
-    ? "Respond in short paragraphs."
-    : "Respond in flat bullet points only. No nested bullets.";
+    ? "Respond in short sections with short paragraphs. Use Markdown headings when the answer has more than one idea to cover."
+    : "Respond in a structured scan-friendly format. Use a direct answer first, then flat bullet points under short Markdown section headings. No nested bullets.";
+}
+
+function structureInstruction(length: AnswerOptions["responseLength"]) {
+  if (length === "long") {
+    return [
+      "Default answer shape:",
+      "1. Start with the direct answer.",
+      "2. Add 2 to 4 short Markdown sections only if they improve clarity.",
+      "3. Use bullets for grouped facts, recommendations, examples, or lists.",
+      "4. Use bold inline annotations such as **Best option:**, **Note:**, or **Watch out:** when useful.",
+      "5. Keep each bullet concise and specific.",
+    ].join("\n");
+  }
+
+  return [
+    "Default answer shape:",
+    "1. Start with the direct answer.",
+    "2. If the answer is not trivial, use short Markdown headings like ## Answer, ## Key points, or ## Next steps.",
+    "3. Use flat bullet points for supporting detail.",
+    "4. Keep sections short and easy to scan.",
+  ].join("\n");
 }
 
 function lengthInstruction(length: AnswerOptions["responseLength"]) {
@@ -61,6 +82,7 @@ export function buildPrompt(
   return [
     "## Answer configuration",
     formatInstruction(options.outputFormat ?? "bullets"),
+    structureInstruction(options.responseLength ?? "short"),
     lengthInstruction(options.responseLength ?? "short"),
     roastInstruction(options.roastLevel ?? "medium"),
     modeInstruction(options.answerMode ?? "fast"),
@@ -101,6 +123,7 @@ export async function* streamAnswer(prompt: string, options: AnswerOptions = {})
         content: [
           BASE_SYSTEM_PROMPT,
           formatInstruction(options.outputFormat ?? "bullets"),
+          structureInstruction(options.responseLength ?? "short"),
           lengthInstruction(options.responseLength ?? "short"),
           roastInstruction(options.roastLevel ?? "medium"),
           modeInstruction(options.answerMode ?? "fast"),
@@ -151,4 +174,40 @@ export async function getFollowUps(
   } catch {
     return [];
   }
+}
+
+export async function generateChatTitle(history: ConversationTurn[] = []): Promise<string | null> {
+  const compactHistory = history
+    .filter((turn) => turn.content.trim())
+    .slice(0, 4)
+    .map((turn) => `${turn.role}: ${turn.content.trim().slice(0, 240)}`)
+    .join("\n");
+
+  if (!compactHistory) return null;
+
+  const res = await groq.chat.completions.create({
+    model: DEFAULT_MODEL,
+    messages: [
+      {
+        role: "user",
+        content: [
+          "Write a concise title for this chat.",
+          "Requirements:",
+          "- 2 to 6 words.",
+          "- Clear and specific.",
+          "- No quotes.",
+          "- No punctuation unless essential.",
+          "- Return only the title text.",
+          "",
+          compactHistory,
+        ].join("\n"),
+      },
+    ],
+    temperature: 0.2,
+    stream: false,
+  });
+
+  const raw = (res.choices[0]?.message?.content ?? "").replace(/["`]/g, "").trim();
+  if (!raw) return null;
+  return raw.length <= 60 ? raw : `${raw.slice(0, 57).trim()}...`;
 }

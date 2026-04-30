@@ -3,6 +3,7 @@ import type { User } from "@clerk/backend";
 import { SUPPORTED_MODELS } from "../prompt";
 import { getDailyMessageLimits } from "./razorpay";
 import type { RazorpaySubscription } from "./razorpay";
+import { generateChatTitle, type ConversationTurn } from "./llm";
 
 function requireEnv(name: string): string {
   const value = process.env[name]?.trim();
@@ -460,6 +461,23 @@ function makeChatTitle(input: string): string {
   return sentence.length <= 60 ? sentence : `${sentence.slice(0, 57).trim()}...`;
 }
 
+async function pruneUnusedEmptyChats(clerkUserId: string, excludeChatId?: string | null) {
+  const query: Record<string, unknown> = {
+    clerkUserId,
+    isDeleted: false,
+    isPinned: false,
+    isArchived: false,
+    "messages.0": { $exists: false },
+    title: "Untitled chat",
+  };
+
+  if (excludeChatId) {
+    query._id = { $ne: ensureObjectId(excludeChatId) };
+  }
+
+  await Chat.deleteMany(query);
+}
+
 async function pickDefaultFolderName(clerkUserId: string) {
   const existing = new Set(
     (await ChatFolder.find({ clerkUserId }, { name: 1 }).lean<any[]>()).map((folder) => String(folder.name).toLowerCase())
@@ -828,6 +846,7 @@ export async function syncUser(user: User) {
 
 export async function getWorkspace(clerkUserId: string) {
   await ensureDatabase();
+  await pruneUnusedEmptyChats(clerkUserId);
 
   const [user, folders, chats, trash, activity] = await Promise.all([
     AppUser.findOne({ clerkUserId }).lean<any>(),
@@ -1163,6 +1182,7 @@ export async function createChat(params: {
   branchFromMessageId?: string | null;
 }) {
   await ensureDatabase();
+  await pruneUnusedEmptyChats(params.clerkUserId);
 
   const defaults = await loadUserDefaults(params.clerkUserId);
   const title = params.title?.trim() || makeChatTitle(params.firstMessage || "");
@@ -1430,7 +1450,19 @@ export async function rewriteChatFromMessage(
   });
 
   const firstUser = rewritten.find((message: any) => message.role === "user");
-  const title = firstUser ? makeChatTitle(firstUser.content) : chat.title;
+  let title = firstUser ? makeChatTitle(firstUser.content) : chat.title;
+
+  if (firstUser) {
+    const titleContext: ConversationTurn[] = rewritten
+      .filter((message: any) => message.role === "user" || message.role === "assistant")
+      .slice(0, 4)
+      .map((message: any) => ({
+        role: message.role,
+        content: String(message.content ?? ""),
+      }));
+
+    title = await generateChatTitle(titleContext).catch(() => null) ?? title;
+  }
 
   const updated = await Chat.findOneAndUpdate(
     { _id: chat._id, clerkUserId },
@@ -1506,7 +1538,15 @@ export async function appendMessage(params: {
 
   let nextTitle = chat.title;
   if (chat.messages.filter((message: any) => message.role === "user").length === 1 && chat.title === "Untitled chat") {
-    nextTitle = makeChatTitle(params.content);
+    const titleContext: ConversationTurn[] = chat.messages
+      .filter((message: any) => message.role === "user" || message.role === "assistant")
+      .slice(0, 4)
+      .map((message: any) => ({
+        role: message.role,
+        content: String(message.content ?? ""),
+      }));
+
+    nextTitle = await generateChatTitle(titleContext).catch(() => null) ?? makeChatTitle(params.content);
   }
 
   const nextSummary = buildConversationSummary(chat.messages);

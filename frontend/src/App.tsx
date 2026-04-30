@@ -31,10 +31,14 @@ import {
   Send,
   Settings,
   Sparkles,
+  Sliders,
   Square,
   Star,
   Sun,
   Trash2,
+  User,
+  Database,
+  CreditCard,
   X,
 } from 'lucide-react'
 
@@ -243,6 +247,7 @@ type SSEHandlers = {
 }
 
 type MainView = 'chat' | 'settings'
+type SettingsSection = 'profile' | 'defaults' | 'chat' | 'data' | 'premium'
 
 const MODEL_OPTIONS = [
   'llama-3.1-8b-instant',
@@ -377,6 +382,59 @@ function dailyLimitLabel(limit: number | null) {
 function safeHostname(url: string) {
   try { return new URL(url).hostname.replace(/^www\./, '') }
   catch { return url }
+}
+
+function formatActivityTypeLabel(type: string) {
+  return type
+    .split('.')
+    .map((part) => part.charAt(0).toUpperCase() + part.slice(1))
+    .join(' ')
+}
+
+function summarizeActivity(item: UsageActivity) {
+  const metadata = item.metadata ?? {}
+
+  if (item.type === 'message.user.created') {
+    const contentLength = typeof metadata.contentLength === 'number' ? metadata.contentLength : null
+    return contentLength ? `User prompt saved${contentLength ? ` • ${contentLength} chars` : ''}` : 'User prompt saved'
+  }
+
+  if (item.type === 'message.assistant.created') {
+    const contentLength = typeof metadata.contentLength === 'number' ? metadata.contentLength : null
+    return contentLength ? `Assistant reply stored • ${contentLength} chars` : 'Assistant reply stored'
+  }
+
+  if (item.type === 'chat.created') {
+    return typeof metadata.title === 'string' && metadata.title
+      ? `New chat created • ${metadata.title}`
+      : 'New chat created'
+  }
+
+  if (item.type === 'chat.archived') return 'Chat moved out of the main list'
+  if (item.type === 'chat.restored') return 'Chat restored from trash'
+  if (item.type === 'chat.deleted') return 'Chat moved to trash'
+  if (item.type === 'folder.created') {
+    return typeof metadata.name === 'string' && metadata.name
+      ? `Folder created • ${metadata.name}`
+      : 'Folder created'
+  }
+  if (item.type === 'billing.subscription.verified') return 'Premium billing verified'
+
+  const importantPairs = Object.entries(metadata)
+    .filter(([, value]) => typeof value === 'string' || typeof value === 'number' || typeof value === 'boolean')
+    .slice(0, 2)
+    .map(([key, value]) => `${key}: ${String(value)}`)
+
+  return importantPairs.length ? importantPairs.join(' • ') : 'Workspace activity recorded'
+}
+
+function activityAccentClass(type: string) {
+  if (type.startsWith('message.user')) return 'border-blue-200 bg-blue-50 text-blue-700 dark:border-blue-400/20 dark:bg-blue-500/12 dark:text-blue-200'
+  if (type.startsWith('message.assistant')) return 'border-violet-200 bg-violet-50 text-violet-700 dark:border-violet-400/20 dark:bg-violet-500/12 dark:text-violet-200'
+  if (type.startsWith('chat.')) return 'border-emerald-200 bg-emerald-50 text-emerald-700 dark:border-emerald-400/20 dark:bg-emerald-500/12 dark:text-emerald-200'
+  if (type.startsWith('folder.')) return 'border-amber-200 bg-amber-50 text-amber-700 dark:border-amber-400/20 dark:bg-amber-500/12 dark:text-amber-200'
+  if (type.startsWith('billing.')) return 'border-cyan-200 bg-cyan-50 text-cyan-700 dark:border-cyan-400/20 dark:bg-cyan-500/12 dark:text-cyan-200'
+  return 'bg-muted text-foreground border-border'
 }
 
 function parseRoute(pathname: string): RouteState {
@@ -530,7 +588,7 @@ function MessageSources({ sources }: { sources: Source[] }) {
             href={source.url}
             target="_blank"
             rel="noreferrer"
-            className="premium-surface flex gap-2 border border-border px-3 py-2 text-xs transition-colors hover:-translate-y-px hover:bg-muted"
+            className="premium-surface flex gap-2 border border-border px-3 py-2 text-xs transition-colors hover:bg-muted"
           >
             <span className="mt-0.5 inline-flex size-5 shrink-0 items-center justify-center overflow-hidden rounded bg-muted text-[10px] font-semibold text-muted-foreground">
               {fav ? <img src={fav} alt="" className="size-4" referrerPolicy="no-referrer" /> : idx + 1}
@@ -557,7 +615,7 @@ function CitationInline({ source, index }: { source: Source; index: number }) {
       >
         {index}
       </a>
-      <span className="pointer-events-none absolute bottom-full left-1/2 z-30 mb-1 hidden w-64 -translate-x-1/2 rounded-md border border-border bg-popover p-3 text-left text-xs shadow-lg group-hover:block">
+      <span className="glass-soft pointer-events-none absolute bottom-full left-1/2 z-30 mb-1 hidden w-64 -translate-x-1/2 rounded-md border border-border p-3 text-left text-xs group-hover:block">
         <span className="flex items-center gap-2">
           {faviconUrl(source.url) ? (
             <img src={faviconUrl(source.url)} alt="" className="size-3.5" referrerPolicy="no-referrer" />
@@ -592,14 +650,14 @@ function WorkspaceSkeleton() {
   return (
     <div className="min-h-dvh overflow-x-hidden bg-background p-3 sm:p-6 lg:h-dvh lg:overflow-hidden">
       <div className="grid gap-3 sm:gap-4 lg:h-full lg:min-h-0 lg:grid-cols-[320px_minmax(0,1fr)]">
-        <div className="rounded-md border border-border bg-card/70 p-4 shadow-sm">
+        <div className="rounded-md border border-border bg-card p-4">
           <Skeleton className="h-10 w-full" />
           <Skeleton className="mt-4 h-8 w-24" />
           <Skeleton className="mt-3 h-9 w-full" />
           <Skeleton className="mt-6 h-20 w-full" />
           <Skeleton className="mt-3 h-20 w-full" />
         </div>
-        <div className="rounded-md border border-border bg-card/70 p-5 shadow-sm">
+        <div className="rounded-md border border-border bg-card p-5">
           <Skeleton className="h-8 w-48" />
           <Skeleton className="mt-6 h-24 w-full" />
           <Skeleton className="mt-4 h-24 w-4/5" />
@@ -658,7 +716,7 @@ function AuthOverlay({
       {isOpen ? (
         <motion.div
           {...fadeUp}
-          className="absolute inset-0 z-40 flex items-center justify-center bg-background/85 p-4 backdrop-blur-sm"
+          className="absolute inset-0 z-40 flex items-center justify-center bg-background/85 p-4"
         >
           <motion.div {...fadeUp} className="w-full max-w-sm">
             <Card className="premium-surface w-full shadow-none">
@@ -741,7 +799,7 @@ function PublicProfilePage({
   return (
     <div className="min-h-screen bg-background px-4 py-4 sm:px-6">
       <div className="mx-auto max-w-5xl space-y-4">
-        <div className="flex items-center justify-between gap-3 rounded-md border border-border bg-card/80 px-4 py-3 shadow-sm">
+        <div className="flex items-center justify-between gap-3 rounded-md border border-border bg-card px-4 py-3">
           <div className="flex items-center gap-3">
             <Button variant="outline" size="icon-sm" onClick={onBack} title="Back to workspace">
               <ArrowLeft className="size-4" />
@@ -892,7 +950,7 @@ function PublicWorkspace({
       <div className="grid gap-3 lg:gap-4 lg:h-full lg:min-h-0 lg:grid-cols-[320px_minmax(0,1fr)]">
         <aside
           className={joinClasses(
-            'fixed inset-y-4 left-4 z-40 flex w-[min(88vw,340px)] min-h-0 flex-col rounded-md border border-border bg-card/92 shadow-lg backdrop-blur-sm transition-transform duration-200 lg:static lg:w-auto lg:translate-x-0 lg:bg-card/75 lg:shadow-sm',
+            'fixed inset-y-4 left-4 z-40 flex w-[min(88vw,340px)] min-h-0 flex-col rounded-md border border-border bg-card transition-transform duration-200 lg:static lg:w-auto lg:translate-x-0',
             showSidebar ? 'translate-x-0' : '-translate-x-[120%]',
           )}
         >
@@ -930,7 +988,7 @@ function PublicWorkspace({
           </div>
         </aside>
 
-        <main className="flex min-h-0 flex-col rounded-md border border-border bg-card/75 shadow-sm backdrop-blur-sm">
+        <main className="flex min-h-0 flex-col rounded-md border border-border bg-card">
           <div className="px-4 py-3 sm:px-5 sm:py-4">
             <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
               <div className="min-w-0">
@@ -988,7 +1046,7 @@ function PublicWorkspace({
             </motion.div>
           </div>
 
-          <div className="mobile-composer sticky bottom-0 z-20 mt-auto border-t border-border/50 bg-card/90 px-4 py-3 backdrop-blur-xl sm:px-5 sm:py-4">
+          <div className="glass mobile-composer sticky bottom-0 z-20 mt-auto border-t border-border px-4 py-3 sm:px-5 sm:py-4">
             <div className="mx-auto max-w-4xl">
               <Textarea
                 value={composer}
@@ -1052,6 +1110,7 @@ function Workspace({
   const [editingTitle, setEditingTitle] = useState(false)
   const [draftTitle, setDraftTitle] = useState('')
   const [mainView, setMainView] = useState<MainView>('chat')
+  const [settingsSection, setSettingsSection] = useState<SettingsSection>('profile')
   const [searchQuery, setSearchQuery] = useState('')
   const [searchResults, setSearchResults] = useState<SearchResultPayload | null>(null)
   const [editingMessageId, setEditingMessageId] = useState<string | null>(null)
@@ -1089,6 +1148,7 @@ function Workspace({
   const [showSidebar, setShowSidebar] = useState(false)
   const abortRef = useRef<AbortController | null>(null)
   const messagesEndRef = useRef<HTMLDivElement | null>(null)
+  const toolsMenuRef = useRef<HTMLDivElement | null>(null)
   const composerRef = useRef<HTMLTextAreaElement | null>(null)
   const [copiedKey, setCopiedKey] = useState<string | null>(null)
 
@@ -1179,10 +1239,58 @@ function Workspace({
 
   const folders = workspace?.folders ?? []
   const chats = workspace?.chats ?? []
+  const usage = workspace?.usage ?? null
+  const usageActivity = usage?.activity ?? []
   const selectedChat = selectedChatId ? chatCache[selectedChatId] ?? null : null
   const currentFolderId = selectedChat?.folderId ?? null
   const userInitial = (workspace?.user.displayName || 'P').trim().charAt(0).toUpperCase()
   const isSettingsOpen = mainView === 'settings'
+
+  const usageOverview = useMemo(() => {
+    const sentToday = usage?.sentToday ?? 0
+    const remainingToday = usage?.remainingToday ?? null
+    const dailyLimit = usage?.dailyLimit ?? null
+    const deletedRecoverableCount = usage?.deletedRecoverableCount ?? 0
+    const totalLoggedEvents = usageActivity.length
+    const userPrompts = usageActivity.filter((item) => item.type === 'message.user.created').length
+    const assistantReplies = usageActivity.filter((item) => item.type === 'message.assistant.created').length
+    const chatsCreated = usageActivity.filter((item) => item.type === 'chat.created').length
+    const quotaRatio = typeof dailyLimit === 'number' && dailyLimit > 0
+      ? Math.min(1, sentToday / dailyLimit)
+      : null
+
+    const recentDays = Array.from({ length: 7 }, (_, offset) => {
+      const date = new Date()
+      date.setHours(0, 0, 0, 0)
+      date.setDate(date.getDate() - (6 - offset))
+      const key = date.toISOString().slice(0, 10)
+      const label = new Intl.DateTimeFormat(undefined, { weekday: 'short' }).format(date)
+      return { key, label, count: 0 }
+    })
+
+    const dayIndex = new Map(recentDays.map((day, index) => [day.key, index]))
+    for (const item of usageActivity) {
+      const key = new Date(item.createdAt).toISOString().slice(0, 10)
+      const index = dayIndex.get(key)
+      if (typeof index === 'number') recentDays[index].count += 1
+    }
+
+    const peakDayCount = Math.max(1, ...recentDays.map((day) => day.count))
+
+    return {
+      sentToday,
+      remainingToday,
+      dailyLimit,
+      deletedRecoverableCount,
+      totalLoggedEvents,
+      userPrompts,
+      assistantReplies,
+      chatsCreated,
+      quotaRatio,
+      recentDays,
+      peakDayCount,
+    }
+  }, [usage, usageActivity])
 
   useEffect(() => {
     if (selectedChat?.settings) {
@@ -1194,6 +1302,32 @@ function Workspace({
   useEffect(() => {
     messagesEndRef.current?.scrollIntoView({ block: 'end' })
   }, [selectedChatId, selectedChat?.messages.length])
+
+  useEffect(() => {
+    if (!showToolsMenu) return
+
+    const handlePointerDown = (event: MouseEvent | TouchEvent) => {
+      if (!toolsMenuRef.current?.contains(event.target as Node)) {
+        setShowToolsMenu(false)
+      }
+    }
+
+    const handleKeyDown = (event: KeyboardEvent) => {
+      if (event.key === 'Escape') {
+        setShowToolsMenu(false)
+      }
+    }
+
+    document.addEventListener('mousedown', handlePointerDown)
+    document.addEventListener('touchstart', handlePointerDown)
+    document.addEventListener('keydown', handleKeyDown)
+
+    return () => {
+      document.removeEventListener('mousedown', handlePointerDown)
+      document.removeEventListener('touchstart', handlePointerDown)
+      document.removeEventListener('keydown', handleKeyDown)
+    }
+  }, [showToolsMenu])
 
   useEffect(() => {
     const isMobileOverlay = (showSidebar || mainView === 'settings')
@@ -1284,6 +1418,19 @@ function Workspace({
   const createNewChat = async (branch?: { chatId: string; messageId?: string | null }) => {
     setIsCreatingChat(true)
     try {
+      const selectedSummary = selectedChatId
+        ? workspace?.chats.find((chat) => chat.id === selectedChatId) ?? workspace?.trash.find((chat) => chat.id === selectedChatId) ?? null
+        : null
+
+      if (
+        !branch
+        && selectedSummary
+        && selectedSummary.messageCount === 0
+        && selectedSummary.title === 'Untitled chat'
+      ) {
+        await authorizedFetch(`/api/chats/${selectedSummary.id}`, { method: 'DELETE' })
+      }
+
       const res = await authorizedFetch('/api/chats', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
@@ -1382,6 +1529,18 @@ function Workspace({
     if (!res.ok && res.status !== 204) throw new Error((await res.json().catch(() => ({ error: `HTTP ${res.status}` })) as { error?: string }).error ?? `HTTP ${res.status}`)
     await loadWorkspace(false)
     setSelectedChatId(null)
+  }
+
+  const softDeleteChatById = async (chatId: string) => {
+    const res = await authorizedFetch(`/api/chats/${chatId}`, { method: 'DELETE' })
+    if (!res.ok && res.status !== 204) throw new Error((await res.json().catch(() => ({ error: `HTTP ${res.status}` })) as { error?: string }).error ?? `HTTP ${res.status}`)
+    setChatCache((current) => {
+      const next = { ...current }
+      delete next[chatId]
+      return next
+    })
+    await loadWorkspace(false)
+    setSelectedChatId((current) => (current === chatId ? null : current))
   }
 
   const attachStreamToAssistant = async (res: Response, chatId: string, signal: AbortSignal) => {
@@ -1888,13 +2047,13 @@ ${renderMarkdown(markdown)}
         key={folder.id}
         {...fadeUp}
         className="space-y-1"
-        style={{ paddingLeft: depth ? `${depth * 10}px` : undefined }}
+        style={{ paddingLeft: depth ? `${depth * 12}px` : undefined }}
       >
-        <div className={joinClasses('premium-surface relative rounded-md border border-border bg-background/70 px-3 py-3 transition-colors hover:bg-muted/60', selectedFolderId === folder.id && 'bg-muted/60')}>
-          <div className="flex items-center gap-3">
+        <div className={joinClasses('premium-surface relative rounded-md border border-border bg-card px-3 py-2.5 transition-colors hover:bg-muted', selectedFolderId === folder.id && 'bg-muted')}>
+          <div className="flex items-center gap-2.5">
             <button
               type="button"
-              className="flex min-w-0 flex-1 items-center gap-3 text-left"
+              className="flex min-w-0 flex-1 items-center gap-2.5 text-left"
               onClick={() => {
                 setSelectedFolderId(folder.id)
                 setShowSidebar(false)
@@ -1904,29 +2063,33 @@ ${renderMarkdown(markdown)}
               <Folder className="size-4 shrink-0 text-muted-foreground" />
               <div className="min-w-0 flex-1">
                 <div className="truncate text-sm font-medium text-foreground">{folder.name}</div>
-                <div className="mt-0.5 text-xs text-muted-foreground">
-                  {groupedChatsCount.get(folder.id) ?? 0} chats
-                  {folder.parentFolderId ? ' • nested folder' : ''}
+                <div className="mt-0.5 flex items-center gap-2 text-[11px] text-muted-foreground">
+                  <span>{groupedChatsCount.get(folder.id) ?? 0} chats</span>
+                  {folder.parentFolderId ? <span>Nested</span> : null}
                 </div>
               </div>
             </button>
-            {folder.isFavorite ? <Star className="size-3.5 shrink-0 fill-current text-muted-foreground" /> : null}
+            <div className="flex items-center gap-1.5">
+              {folder.isFavorite ? <Star className="size-3.5 shrink-0 fill-current text-muted-foreground" /> : null}
+              <div className="rounded-full border border-border px-2 py-0.5 text-[11px] text-muted-foreground">
+                {groupedChatsCount.get(folder.id) ?? 0}
+              </div>
+            </div>
             <Button
               variant="ghost"
-              size="sm"
-              className="shrink-0"
+              size="icon-sm"
+              className="h-8 w-8 shrink-0"
               title="Folder tools"
               onClick={() => setOpenFolderMenuId((current) => current === folder.id ? null : folder.id)}
             >
-              <MoreHorizontal className="mr-2 size-4" />
-              Tools
+              <MoreHorizontal className="size-4" />
             </Button>
           </div>
           <AnimatePresence>
           {openFolderMenuId === folder.id ? (
             <motion.div
               {...fadeUp}
-              className="mt-2 rounded-md border border-border bg-popover/95 p-1 shadow-md"
+              className="glass-soft relative mt-2 rounded-md border border-border p-1"
             >
               {[
                 {
@@ -1967,7 +2130,7 @@ ${renderMarkdown(markdown)}
                       item.action().catch((error: Error) => setErrorMessage(error.message))
                       setOpenFolderMenuId(null)
                     }}
-                    className="flex w-full items-start gap-3 rounded-xl px-3 py-2 text-left transition-colors hover:bg-muted"
+                    className="flex w-full items-start gap-3 rounded-md px-3 py-2 text-left transition-colors hover:bg-muted"
                   >
                     <Icon className="mt-0.5 size-4 shrink-0 text-muted-foreground" />
                     <div className="min-w-0">
@@ -1987,7 +2150,7 @@ ${renderMarkdown(markdown)}
   }
 
   return (
-    <div className="min-h-dvh overflow-x-hidden bg-background p-3 safe-x sm:p-6 lg:h-dvh lg:overflow-hidden">
+    <div className="min-h-dvh overflow-x-hidden bg-background p-0 safe-x lg:h-dvh lg:overflow-hidden">
       <div className="safe-top mb-3 flex items-center gap-2 lg:hidden">
         <Button
           variant="outline"
@@ -2022,7 +2185,7 @@ ${renderMarkdown(markdown)}
           <motion.button
             type="button"
             aria-label="Close navigation"
-            className="fixed inset-0 z-30 bg-background/70 backdrop-blur-sm lg:hidden anim-fade-in"
+            className="fixed inset-0 z-30 bg-background/70 lg:hidden anim-fade-in"
             initial={{ opacity: 0 }}
             animate={{ opacity: 1 }}
             exit={{ opacity: 0 }}
@@ -2031,14 +2194,14 @@ ${renderMarkdown(markdown)}
         ) : null}
       </AnimatePresence>
 
-      <div className="grid gap-3 sm:gap-4 lg:h-full lg:min-h-0 lg:grid-cols-[320px_minmax(0,1fr)]">
+      <div className="grid gap-0 lg:h-full lg:min-h-0 lg:grid-cols-[320px_minmax(0,1fr)]">
         <aside
           className={joinClasses(
-            'fixed inset-y-2 left-2 z-40 flex w-[min(86vw,340px)] min-h-0 flex-col overflow-hidden rounded-lg border border-border bg-card/95 shadow-2xl backdrop-blur-md transition-transform duration-250 ease-[cubic-bezier(0.22,1,0.36,1)] safe-top lg:static lg:inset-auto lg:w-auto lg:rounded-md lg:translate-x-0 lg:bg-card/75 lg:shadow-sm lg:backdrop-blur-none',
+            'glass fixed inset-y-0 left-0 z-40 flex w-[min(86vw,340px)] min-h-0 flex-col overflow-hidden rounded-none border border-border transition-transform duration-250 ease-[cubic-bezier(0.22,1,0.36,1)] safe-top lg:static lg:inset-auto lg:w-auto lg:translate-x-0 lg:rounded-r-none lg:border-r-0',
             showSidebar ? 'translate-x-0' : '-translate-x-[110%] lg:translate-x-0',
           )}
         >
-          <div className="flex items-center justify-between gap-2 px-4 py-4">
+          <div className="flex items-center justify-between gap-2 px-5 py-5">
             <div className="min-w-0">
               <h1 className="truncate text-lg font-semibold tracking-tight">poorplexity</h1>
               <p className="truncate text-xs text-muted-foreground">Research workspace</p>
@@ -2061,7 +2224,7 @@ ${renderMarkdown(markdown)}
             </div>
           </div>
 
-          <div className="space-y-3 p-4">
+          <div className="space-y-3 px-5 pb-4">
             <div className="flex items-stretch gap-2">
               <Button className="h-10 flex-1 justify-start" disabled={isCreatingChat} onClick={() => createNewChat().catch((error: Error) => setErrorMessage(error.message))}>
                 {isCreatingChat ? <Loader2 className="mr-2 size-4 animate-spin" /> : <Plus className="mr-2 size-4" />}
@@ -2097,9 +2260,12 @@ ${renderMarkdown(markdown)}
             </div>
           </div>
 
-          <div className="space-y-3 p-4">
+          <div className="space-y-3 px-5 py-4">
             <div className="flex items-center justify-between gap-3">
-              <div className="text-[11px] font-medium uppercase tracking-[0.12em] text-muted-foreground/75">Folders</div>
+              <div>
+                <div className="text-[11px] font-medium uppercase tracking-[0.12em] text-muted-foreground/75">Folders</div>
+                <div className="mt-1 text-[11px] text-muted-foreground">{folders.length} total</div>
+              </div>
               <Button variant={showFolderCreator ? 'secondary' : 'outline'} size="sm" onClick={() => setShowFolderCreator((current) => !current)}>
                 <FolderPlus className="mr-2 size-4" />
                 {showFolderCreator ? 'Close' : 'New folder'}
@@ -2136,7 +2302,7 @@ ${renderMarkdown(markdown)}
 
           <Separator />
 
-          <div className="flex-1 min-h-0 overflow-y-auto p-3 safe-bottom">
+          <div className="flex-1 min-h-0 overflow-y-auto px-4 pb-4 safe-bottom">
             {searchQuery.trim() ? (
               <div className="space-y-4">
                 <div className="space-y-2">
@@ -2173,43 +2339,69 @@ ${renderMarkdown(markdown)}
                 </div>
               </div>
             ) : (
-              <div className="space-y-4">
-                {renderFolders(null)}
-                <motion.div variants={subtleList} initial={false} animate="animate" className="space-y-2 pt-1">
+              <div className="space-y-5">
+                <div className="space-y-2">
+                  {renderFolders(null)}
+                </div>
+
+                <div className="space-y-2">
+                  <div className="flex items-center justify-between px-1">
+                    <div className="text-[11px] font-medium uppercase tracking-[0.12em] text-muted-foreground/75">
+                      {selectedFolderId ? 'Chats in folder' : 'Chats'}
+                    </div>
+                    <div className="text-[11px] text-muted-foreground">{visibleChats.length}</div>
+                  </div>
+                <motion.div variants={subtleList} initial={false} animate="animate" className="space-y-2">
                   {visibleChats.map((chat) => (
                     <motion.div
                       variants={fadeUp}
                       key={chat.id}
                     >
-                      <button
-                        draggable
-                        onDragStart={(event: DragEvent<HTMLButtonElement>) => event.dataTransfer.setData('text/plain', chat.id)}
-                        onClick={() => { setSelectedChatId(chat.id); setMainView('chat'); setShowSidebar(false) }}
-                        className={joinClasses('premium-surface w-full rounded-md border border-border bg-background/70 px-3 py-2 text-left transition-colors hover:bg-muted', selectedChatId === chat.id && 'bg-muted')}
-                      >
-                        <div className="flex items-start gap-2">
-                          <MessageSquare className="mt-0.5 size-3.5 shrink-0 text-muted-foreground" />
-                          <div className="min-w-0 flex-1">
-                            <div className="flex items-center gap-2">
-                              <div className="truncate text-sm font-medium">{chat.title}</div>
-                              {chat.isPinned ? <Pin className="size-3 text-muted-foreground" /> : null}
-                              {chat.branchFromChatId ? <GitBranch className="size-3 text-muted-foreground" /> : null}
+                      <div className={joinClasses('premium-surface rounded-md border border-border bg-card px-3 py-2.5 transition-colors hover:bg-muted', selectedChatId === chat.id && 'bg-muted')}>
+                        <div className="flex items-start gap-2.5">
+                          <button
+                            draggable
+                            onDragStart={(event: DragEvent<HTMLButtonElement>) => event.dataTransfer.setData('text/plain', chat.id)}
+                            onClick={() => { setSelectedChatId(chat.id); setMainView('chat'); setShowSidebar(false) }}
+                            className="flex min-w-0 flex-1 items-start gap-2.5 text-left"
+                          >
+                            <MessageSquare className="mt-0.5 size-4 shrink-0 text-muted-foreground" />
+                            <div className="min-w-0 flex-1">
+                              <div className="flex items-center gap-2">
+                                <div className="truncate text-sm font-medium">{chat.title}</div>
+                                {chat.isPinned ? <Pin className="size-3 text-muted-foreground" /> : null}
+                                {chat.branchFromChatId ? <GitBranch className="size-3 text-muted-foreground" /> : null}
+                              </div>
+                              <div className="mt-1 line-clamp-2 text-xs leading-5 text-muted-foreground">{chat.lastMessagePreview || 'No messages yet.'}</div>
                             </div>
-                            <div className="mt-1 line-clamp-2 text-xs text-muted-foreground">{chat.lastMessagePreview || 'No messages yet.'}</div>
-                          </div>
+                          </button>
+                          <Button
+                            variant="ghost"
+                            size="icon-xs"
+                            className="mt-0.5 shrink-0"
+                            title="Delete chat"
+                            onClick={(event) => {
+                              event.stopPropagation()
+                              softDeleteChatById(chat.id).catch((error: Error) => setErrorMessage(error.message))
+                            }}
+                          >
+                            <Trash2 className="size-3.5" />
+                          </Button>
                         </div>
-                      </button>
+                      </div>
                     </motion.div>
                   ))}
                 </motion.div>
+                </div>
               </div>
             )}
           </div>
         </aside>
 
-        <main className="relative flex min-h-0 flex-col rounded-md border border-border bg-card/75 shadow-sm backdrop-blur-sm">
-          <div className="flex flex-col gap-3 px-4 py-3 sm:px-5 sm:py-4 lg:flex-row lg:items-center lg:justify-between">
-            <div className="min-w-0">
+        <main className="relative flex min-h-0 flex-col overflow-hidden rounded-none border border-border bg-card lg:rounded-l-none">
+          <div className="border-b border-border/60 px-5 py-5">
+            <div className="mx-auto flex w-full max-w-[1120px] flex-col gap-4 lg:flex-row lg:items-start lg:justify-between">
+              <div className="min-w-0 flex-1">
               {selectedChat ? (
                 editingTitle ? (
                   <div className="flex flex-col gap-2 sm:flex-row">
@@ -2239,8 +2431,8 @@ ${renderMarkdown(markdown)}
               )}
             </div>
 
-            {selectedChat ? (
-              <div className="relative flex flex-wrap items-center gap-1 sm:justify-end">
+              {selectedChat ? (
+              <div className="relative flex shrink-0 flex-wrap items-center gap-2 lg:justify-end">
                 <Button
                   variant={isSettingsOpen ? 'secondary' : 'outline'}
                   size="sm"
@@ -2250,22 +2442,24 @@ ${renderMarkdown(markdown)}
                   <Settings className="mr-2 size-4" />
                   Settings
                 </Button>
-                <Button
-                  variant="outline"
-                  size="sm"
-                  title="Open tools menu"
-                  onClick={() => setShowToolsMenu((current) => !current)}
-                >
-                  <MoreHorizontal className="mr-2 size-4" />
-                  Tools
-                </Button>
-                    <AnimatePresence>
-                      {showToolsMenu ? (
-                  <motion.div
-                    {...fadeScale}
-                    className="absolute right-0 top-full z-20 mt-2 w-[min(calc(100vw-2rem),18rem)] max-h-[60vh] overflow-y-auto rounded-md border border-border bg-popover/95 p-1 shadow-lg backdrop-blur-sm"
+                <div ref={toolsMenuRef} className="relative">
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    title="Open tools menu"
+                    aria-expanded={showToolsMenu}
+                    onClick={() => setShowToolsMenu((current) => !current)}
                   >
-                    {[
+                    <MoreHorizontal className="mr-2 size-4" />
+                    Tools
+                  </Button>
+                  <AnimatePresence>
+                    {showToolsMenu ? (
+                      <motion.div
+                        {...fadeScale}
+                        className="glass-soft absolute right-0 top-full z-20 mt-2 w-[min(calc(100vw-2rem),18rem)] max-h-[60vh] overflow-y-auto rounded-md border border-border p-1"
+                      >
+                        {[
                       {
                         key: 'rename',
                         icon: Pencil,
@@ -2329,28 +2523,30 @@ ${renderMarkdown(markdown)}
                         description: 'Soft-delete this chat with a restore window.',
                         action: () => { softDeleteSelectedChat().catch((error: Error) => setErrorMessage(error.message)); setShowToolsMenu(false) },
                       },
-                    ].map((item) => {
-                      const Icon = item.icon
-                      return (
-                        <button
-                          key={item.key}
-                          type="button"
-                          onClick={item.action}
-                          className="flex w-full items-start gap-3 rounded-xl px-3 py-2 text-left transition-colors hover:bg-muted"
-                        >
-                          <Icon className="mt-0.5 size-4 shrink-0 text-muted-foreground" />
-                          <div className="min-w-0">
-                            <div className="text-sm font-medium">{item.label}</div>
-                            <div className="text-xs text-muted-foreground">{item.description}</div>
-                          </div>
-                        </button>
-                      )
-                    })}
-                  </motion.div>
-                ) : null}
-                </AnimatePresence>
+                        ].map((item) => {
+                          const Icon = item.icon
+                          return (
+                            <button
+                              key={item.key}
+                              type="button"
+                              onClick={item.action}
+                              className="flex w-full items-start gap-3 rounded-md px-3 py-2 text-left transition-colors hover:bg-muted"
+                            >
+                              <Icon className="mt-0.5 size-4 shrink-0 text-muted-foreground" />
+                              <div className="min-w-0">
+                                <div className="text-sm font-medium">{item.label}</div>
+                                <div className="text-xs text-muted-foreground">{item.description}</div>
+                              </div>
+                            </button>
+                          )
+                        })}
+                      </motion.div>
+                    ) : null}
+                  </AnimatePresence>
+                </div>
               </div>
             ) : null}
+            </div>
           </div>
 
           {errorMessage ? (
@@ -2366,19 +2562,19 @@ ${renderMarkdown(markdown)}
           {selectedChat ? (
             <>
               <div className="flex-1 overflow-visible lg:min-h-0 lg:overflow-y-auto">
-                <div className="mx-auto flex max-w-5xl flex-col gap-4 px-4 py-3 sm:gap-5 sm:px-5 sm:py-5">
+                <div className="mx-auto flex w-full max-w-[1120px] flex-col gap-5 px-5 py-5">
                   {selectedChat.summary ? (
-                    <Card className="shadow-none">
+                    <Card className="max-w-[56rem] shadow-none">
                       <CardHeader><CardTitle className="text-base">Conversation summary</CardTitle></CardHeader>
                       <CardContent><p className="whitespace-pre-wrap text-sm leading-6 text-muted-foreground">{selectedChat.summary}</p></CardContent>
                     </Card>
                   ) : null}
 
-                  <motion.div variants={subtleList} initial={false} animate="animate" className="flex flex-col gap-4 sm:gap-5">
+                  <motion.div variants={subtleList} initial={false} animate="animate" className="flex w-full flex-col gap-5">
                     {!selectedChat.messages.length ? (
                       <motion.div
                         {...fadeUp}
-                        className="rounded-md border border-border bg-background/55 px-4 py-6 text-center sm:px-6"
+                        className="max-w-[56rem] rounded-md border border-border bg-background/55 px-5 py-8 text-center"
                       >
                         <div className="mx-auto mb-3 flex size-10 items-center justify-center rounded-md bg-muted">
                           <MessageSquare className="size-4" />
@@ -2394,35 +2590,51 @@ ${renderMarkdown(markdown)}
                         key={message.id}
                         variants={fadeUp}
                         layout
-                        className={joinClasses('premium-surface max-w-4xl overflow-hidden rounded-md border border-border px-4 py-4', message.role === 'user' ? 'ml-auto bg-muted/80' : 'bg-background/70')}
+                        className={joinClasses(
+                          'premium-surface w-full overflow-hidden rounded-md border border-border px-5 py-4',
+                          message.role === 'user'
+                            ? 'ml-auto max-w-[34rem] bg-muted/80'
+                            : 'max-w-[56rem] bg-background/70'
+                        )}
                       >
+                        {(() => {
+                          const isStreamingMessage = message.role === 'assistant' && isSending && selectedChat.messages.at(-1)?.id === message.id
+                          return (
+                            <>
                         <div className="mb-3 flex items-center gap-2">
                           <Badge variant={message.role === 'user' ? 'secondary' : 'outline'}>{message.role === 'user' ? 'You' : 'Assistant'}</Badge>
                           <span className="text-xs text-muted-foreground">{timeLabel(message.createdAt)}</span>
                           {message.editedAt ? <Badge variant="outline">Edited</Badge> : null}
                           {message.webSearchUsed ? <Badge variant="outline">Web</Badge> : null}
                           {confidenceLabel(message.confidence) ? <Badge variant="outline">{confidenceLabel(message.confidence)}</Badge> : null}
+                          {isStreamingMessage ? <Badge variant="outline">Typing</Badge> : null}
                         </div>
                         {message.role === 'assistant' ? (
-                          <div className="prose-answer">
-                            <ReactMarkdown
-                              remarkPlugins={[remarkGfm]}
-                              components={{
-                                a: ({ href, children, ...rest }) => {
-                                  if (href?.startsWith('cite-')) {
-                                    const idx = Number(href.slice(5))
-                                    const source = message.sources?.[idx - 1]
-                                    if (source) return <CitationInline source={source} index={idx} />
-                                  }
-                                  return <a href={href} target="_blank" rel="noreferrer" {...rest}>{children}</a>
-                                },
-                              }}
-                            >
-                              {message.content
-                                ? preprocessCitations(message.content, message.sources?.length ?? 0)
-                                : (isSending && selectedChat.messages.at(-1)?.id === message.id ? 'Thinking...' : '')}
-                            </ReactMarkdown>
-                          </div>
+                          message.content ? (
+                            <div className={joinClasses('prose-answer', isStreamingMessage && 'streaming-answer')} aria-live={isStreamingMessage ? 'polite' : undefined}>
+                              <ReactMarkdown
+                                remarkPlugins={[remarkGfm]}
+                                components={{
+                                  a: ({ href, children, ...rest }) => {
+                                    if (href?.startsWith('cite-')) {
+                                      const idx = Number(href.slice(5))
+                                      const source = message.sources?.[idx - 1]
+                                      if (source) return <CitationInline source={source} index={idx} />
+                                    }
+                                    return <a href={href} target="_blank" rel="noreferrer" {...rest}>{children}</a>
+                                  },
+                                }}
+                              >
+                                {preprocessCitations(message.content, message.sources?.length ?? 0)}
+                              </ReactMarkdown>
+                            </div>
+                          ) : isStreamingMessage ? (
+                            <div className="streaming-indicator" aria-live="polite" aria-label="Assistant is typing">
+                              <span />
+                              <span />
+                              <span />
+                            </div>
+                          ) : null
                         ) : (
                           <p className="whitespace-pre-wrap text-sm leading-7">{message.content}</p>
                         )}
@@ -2501,6 +2713,9 @@ ${renderMarkdown(markdown)}
                             </div>
                           ) : null}
                         </div>
+                            </>
+                          )
+                        })()}
                       </motion.section>
                     ))}
                     <div ref={messagesEndRef} />
@@ -2508,11 +2723,11 @@ ${renderMarkdown(markdown)}
                 </div>
               </div>
 
-              <div className="mobile-composer sticky bottom-0 z-20 mt-auto border-t border-border/50 bg-card/90 px-4 py-3 backdrop-blur-xl sm:px-5 sm:py-4">
-                <div className="mx-auto max-w-5xl">
+              <div className="glass mobile-composer sticky bottom-0 z-20 mt-auto border-t border-border px-5 py-4">
+                <div className="mx-auto w-full max-w-[1120px]">
                   <AnimatePresence>
                     {showUpgradePrompt ? (
-                      <motion.div {...fadeScale} className="mb-3 rounded-md border border-border bg-background/75 px-4 py-3 shadow-sm">
+                      <motion.div {...fadeScale} className="mb-3 rounded-md border border-border bg-background px-4 py-3">
                         <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
                           <div>
                             <div className="text-sm font-medium">You’ve used today’s free messages.</div>
@@ -2553,7 +2768,7 @@ ${renderMarkdown(markdown)}
                       }
                     }}
                     placeholder={editingMessageId ? 'Update that earlier message and resend.' : 'Ask a follow-up. ⌘K new chat · ⌘/ focus · ↑ edit last · Esc stop. Shift+Enter for a new line.'}
-                    className="min-h-16 max-h-36 sm:min-h-28"
+                    className="min-h-[9rem] max-h-40 px-4 py-3"
                   />
                   <div className="mt-3 flex flex-col gap-2 sm:flex-row sm:flex-wrap sm:items-center sm:justify-between">
                     <div className="flex flex-col gap-2 text-[11px] text-muted-foreground sm:flex-row sm:flex-wrap sm:items-center sm:gap-3 sm:text-xs">
@@ -2623,34 +2838,84 @@ ${renderMarkdown(markdown)}
                 <motion.button
                   type="button"
                   aria-label="Close settings"
-                  className="fixed inset-0 z-30 bg-background/75 backdrop-blur-sm anim-fade-in"
+                  className="fixed inset-0 z-30 bg-background/75 anim-fade-in"
                   onClick={() => setMainView('chat')}
                 />
                 <motion.div
                   {...fadeScale}
                   className="fixed inset-0 z-40 flex items-stretch justify-center sm:items-start sm:p-6"
                 >
-                  <Card className="flex h-dvh w-full max-w-none flex-col rounded-none border-0 bg-card shadow-2xl safe-top safe-bottom sm:h-auto sm:max-h-[calc(100dvh-3rem)] sm:max-w-3xl sm:rounded-md sm:border sm:border-border">
-                    <CardHeader className="border-b border-border">
-                      <div className="flex items-start justify-between gap-4">
-                        <div>
-                          <CardTitle className="text-base">Settings</CardTitle>
-                          <CardDescription className="mt-1">
-                            Account, reply defaults, current chat behavior, and billing in one place.
-                          </CardDescription>
-                        </div>
-                        <Button variant="ghost" size="icon-sm" title="Close settings" onClick={() => setMainView('chat')}>
+                  <Card className="glass-strong relative flex h-dvh w-full max-w-none flex-col gap-0 overflow-hidden rounded-none border-0 py-0 safe-top safe-bottom md:h-[calc(100dvh-4rem)] md:max-h-[680px] md:max-w-4xl md:flex-row md:rounded-md md:border md:border-border">
+                    {/* Left rail */}
+                    <aside className="flex shrink-0 flex-row gap-1 overflow-x-auto border-b border-border/60 px-3 pt-3 pb-3 md:w-60 md:flex-col md:gap-0.5 md:overflow-x-visible md:overflow-y-auto md:border-b-0 md:border-r md:px-3 md:pt-4 md:pb-4">
+                      <Button
+                        variant="ghost"
+                        size="icon-sm"
+                        className="hidden h-9 w-9 shrink-0 md:inline-flex"
+                        title="Close settings"
+                        onClick={() => setMainView('chat')}
+                      >
+                        <X className="size-4" />
+                      </Button>
+                      <div className="hidden md:mt-3 md:mb-2 md:block md:px-2 md:text-xs md:font-semibold md:uppercase md:tracking-[0.08em] md:text-muted-foreground">Settings</div>
+                      {([
+                        { id: 'profile' as const, label: 'Profile', icon: User },
+                        { id: 'defaults' as const, label: 'Defaults', icon: Sliders },
+                        { id: 'chat' as const, label: 'Current chat', icon: MessageSquare },
+                        { id: 'data' as const, label: 'Data & usage', icon: Database },
+                        { id: 'premium' as const, label: 'Billing', icon: CreditCard },
+                      ]).map((item) => {
+                        const Icon = item.icon
+                        const active = settingsSection === item.id
+                        return (
+                          <button
+                            key={item.id}
+                            type="button"
+                            onClick={() => setSettingsSection(item.id)}
+                            className={joinClasses(
+                              'group/rail flex shrink-0 items-center gap-2.5 rounded-md px-3 py-2 text-sm font-medium transition-colors',
+                              active
+                                ? 'bg-muted text-foreground'
+                                : 'text-muted-foreground hover:bg-muted/60 hover:text-foreground',
+                              'md:w-full md:justify-start'
+                            )}
+                          >
+                            <Icon className={joinClasses('size-4 shrink-0', active ? 'text-foreground' : 'text-muted-foreground group-hover/rail:text-foreground')} />
+                            <span>{item.label}</span>
+                          </button>
+                        )
+                      })}
+                      <div className="ml-auto md:hidden">
+                        <Button variant="ghost" size="icon-sm" className="h-9 w-9 shrink-0" title="Close settings" onClick={() => setMainView('chat')}>
                           <X className="size-4" />
                         </Button>
                       </div>
-                    </CardHeader>
-                    <CardContent className="flex-1 overflow-y-auto px-0">
-                      <div className="space-y-6 p-4 sm:p-5">
+                    </aside>
+
+                    {/* Right pane */}
+                    <div className="flex min-w-0 flex-1 flex-col">
+                      <div className="flex items-baseline justify-between gap-3 border-b border-border/60 px-5 pt-5 pb-4 md:px-7 md:pt-6 md:pb-5">
+                        <div>
+                          <h2 className="text-lg font-semibold tracking-tight">{
+                            settingsSection === 'profile' ? 'Profile'
+                              : settingsSection === 'defaults' ? 'Defaults'
+                              : settingsSection === 'chat' ? 'Current chat'
+                              : settingsSection === 'data' ? 'Data & usage'
+                              : 'Billing'
+                          }</h2>
+                          <p className="mt-1 text-xs text-muted-foreground sm:text-sm">{
+                            settingsSection === 'profile' ? 'Manage your public identity and profile details.'
+                              : settingsSection === 'defaults' ? 'Set how new chats should behave before you start typing.'
+                              : settingsSection === 'chat' ? 'Settings that apply only to the chat you have open right now.'
+                              : settingsSection === 'data' ? 'Track your quota and manage the data we store for your workspace.'
+                              : 'Plan, status, and subscription management.'
+                          }</p>
+                        </div>
+                      </div>
+                      <div className="flex-1 overflow-y-auto px-5 py-5 md:px-7 md:py-6">
+                      <div className="space-y-6">
+                        {settingsSection === 'profile' ? (
                         <section className="space-y-4">
-                          <div>
-                            <h3 className="text-sm font-medium">Profile</h3>
-                            <p className="mt-1 text-xs text-muted-foreground">Manage your public identity and profile details.</p>
-                          </div>
                           <div className="grid gap-4 md:grid-cols-2">
                             <div className="grid gap-2">
                               <label className="text-sm font-medium">Display name</label>
@@ -2684,14 +2949,10 @@ ${renderMarkdown(markdown)}
                             </div>
                           </div>
                         </section>
+                        ) : null}
 
-                        <Separator />
-
+                        {settingsSection === 'defaults' ? (
                         <section className="space-y-4">
-                          <div>
-                            <h3 className="text-sm font-medium">Defaults</h3>
-                            <p className="mt-1 text-xs text-muted-foreground">Set how new chats should behave before you start typing.</p>
-                          </div>
                           <div className="grid gap-4 md:grid-cols-2">
                             <div className="grid gap-2">
                               <label className="text-sm font-medium">Roast level</label>
@@ -2753,14 +3014,10 @@ ${renderMarkdown(markdown)}
                             </div>
                           </div>
                         </section>
+                        ) : null}
 
-                        <Separator />
-
+                        {settingsSection === 'chat' ? (
                         <section className="space-y-4">
-                          <div>
-                            <h3 className="text-sm font-medium">Current chat</h3>
-                            <p className="mt-1 text-xs text-muted-foreground">These settings apply only to the chat you have open right now.</p>
-                          </div>
                           {selectedChat ? (
                             <div className="grid gap-4 md:grid-cols-2">
                               <div className="grid gap-2">
@@ -2836,51 +3093,173 @@ ${renderMarkdown(markdown)}
                             </div>
                           )}
                         </section>
+                        ) : null}
 
-                        <Separator />
-
-                        <section className="space-y-4">
-                          <div>
-                            <h3 className="text-sm font-medium">Usage and data</h3>
-                            <p className="mt-1 text-xs text-muted-foreground">Track your quota and manage the data we store for your workspace.</p>
-                          </div>
-                          <div className="grid gap-4 md:grid-cols-3">
-                            <div className="border border-border bg-background/50 px-4 py-3"><div className="text-xs text-muted-foreground">Sent today</div><div className="mt-1 text-2xl font-semibold">{workspace?.usage.sentToday ?? 0}</div></div>
-                            <div className="border border-border bg-background/50 px-4 py-3"><div className="text-xs text-muted-foreground">Remaining</div><div className="mt-1 text-2xl font-semibold">{workspace?.usage.remainingToday ?? 'Unlimited'}</div></div>
-                            <div className="border border-border bg-background/50 px-4 py-3"><div className="text-xs text-muted-foreground">Recoverable deleted chats</div><div className="mt-1 text-2xl font-semibold">{workspace?.usage.deletedRecoverableCount ?? 0}</div></div>
-                          </div>
-                          <div className="border border-border bg-background/50">
-                            {(workspace?.usage.activity ?? []).slice(0, 10).map((item, index) => (
-                              <div key={item.id} className={joinClasses('flex items-start justify-between gap-3 px-4 py-3', index > 0 && 'border-t border-border')}>
-                                <div className="min-w-0">
-                                  <div className="text-sm font-medium">{item.type}</div>
-                                  <div className="truncate text-xs text-muted-foreground">{JSON.stringify(item.metadata ?? {})}</div>
+                        {settingsSection === 'data' ? (
+                        <section className="space-y-5">
+                          <div className="grid gap-4 xl:grid-cols-[1.3fr_0.9fr]">
+                            <Card className="overflow-hidden border-border/70 bg-background/55 shadow-none">
+                              <CardContent className="grid gap-5 px-5 py-5">
+                                <div className="flex items-start justify-between gap-4">
+                                  <div>
+                                    <div className="text-xs font-medium uppercase tracking-[0.08em] text-muted-foreground">Quota overview</div>
+                                    <div className="mt-2 text-3xl font-semibold tracking-tight">
+                                      {usageOverview.remainingToday === null ? 'Unlimited' : usageOverview.remainingToday}
+                                    </div>
+                                    <div className="mt-1 text-sm text-muted-foreground">
+                                      {usageOverview.remainingToday === null
+                                        ? 'No daily cap on this plan.'
+                                        : `${usageOverview.sentToday} sent today out of ${usageOverview.dailyLimit ?? usageOverview.sentToday}.`}
+                                    </div>
+                                  </div>
+                                  <Badge variant="outline">
+                                    {workspace?.user.billing.isPremium ? 'Premium' : 'Free'}
+                                  </Badge>
                                 </div>
-                                <div className="shrink-0 text-xs text-muted-foreground">{timeLabel(item.createdAt)}</div>
-                              </div>
-                            ))}
+
+                                <div className="space-y-2">
+                                  <div className="h-2 overflow-hidden rounded-full bg-muted">
+                                    <div
+                                      className="h-full rounded-full bg-primary transition-[width] duration-300"
+                                      style={{ width: `${((usageOverview.quotaRatio ?? 0) * 100) || 4}%` }}
+                                    />
+                                  </div>
+                                  <div className="flex items-center justify-between text-xs text-muted-foreground">
+                                    <span>Usage today</span>
+                                    <span>{usageOverview.dailyLimit === null ? 'Unmetered' : `${Math.round((usageOverview.quotaRatio ?? 0) * 100)}% used`}</span>
+                                  </div>
+                                </div>
+
+                                <div className="grid gap-3 sm:grid-cols-3">
+                                  <div className="rounded-md border border-border/70 bg-background/60 px-4 py-3">
+                                    <div className="text-xs text-muted-foreground">Sent today</div>
+                                    <div className="mt-1 text-2xl font-semibold">{usageOverview.sentToday}</div>
+                                  </div>
+                                  <div className="rounded-md border border-border/70 bg-background/60 px-4 py-3">
+                                    <div className="text-xs text-muted-foreground">Recoverable chats</div>
+                                    <div className="mt-1 text-2xl font-semibold">{usageOverview.deletedRecoverableCount}</div>
+                                  </div>
+                                  <div className="rounded-md border border-border/70 bg-background/60 px-4 py-3">
+                                    <div className="text-xs text-muted-foreground">Logged events</div>
+                                    <div className="mt-1 text-2xl font-semibold">{usageOverview.totalLoggedEvents}</div>
+                                  </div>
+                                </div>
+                              </CardContent>
+                            </Card>
+
+                            <Card className="overflow-hidden border-border/70 bg-background/55 shadow-none">
+                              <CardHeader>
+                                <CardTitle className="text-base">Workspace pulse</CardTitle>
+                                <CardDescription>Recent activity patterns across prompts, replies, and chat creation.</CardDescription>
+                              </CardHeader>
+                              <CardContent className="space-y-5">
+                                <div className="grid grid-cols-3 gap-3">
+                                  <div className="rounded-md border border-border/70 bg-background/60 px-3 py-3">
+                                    <div className="text-[11px] text-muted-foreground">Prompts</div>
+                                    <div className="mt-1 text-xl font-semibold">{usageOverview.userPrompts}</div>
+                                  </div>
+                                  <div className="rounded-md border border-border/70 bg-background/60 px-3 py-3">
+                                    <div className="text-[11px] text-muted-foreground">Replies</div>
+                                    <div className="mt-1 text-xl font-semibold">{usageOverview.assistantReplies}</div>
+                                  </div>
+                                  <div className="rounded-md border border-border/70 bg-background/60 px-3 py-3">
+                                    <div className="text-[11px] text-muted-foreground">Chats</div>
+                                    <div className="mt-1 text-xl font-semibold">{usageOverview.chatsCreated}</div>
+                                  </div>
+                                </div>
+
+                                <div>
+                                  <div className="mb-3 text-xs font-medium uppercase tracking-[0.08em] text-muted-foreground">Last 7 days</div>
+                                  <div className="grid h-28 grid-cols-7 items-end gap-2">
+                                    {usageOverview.recentDays.map((day) => (
+                                      <div key={day.key} className="flex min-h-0 flex-col items-center justify-end gap-2">
+                                        <div className="flex h-20 w-full items-end">
+                                          <div
+                                            className="w-full rounded-sm bg-primary/80"
+                                            style={{ height: `${Math.max(8, Math.round((day.count / usageOverview.peakDayCount) * 100))}%` }}
+                                            title={`${day.count} events`}
+                                          />
+                                        </div>
+                                        <div className="text-[11px] text-muted-foreground">{day.label}</div>
+                                      </div>
+                                    ))}
+                                  </div>
+                                </div>
+                              </CardContent>
+                            </Card>
                           </div>
-                          <div className="flex flex-wrap justify-end gap-2">
-                            <Button variant="outline" disabled={isExportingData} onClick={() => exportStoredData().catch((error: Error) => setErrorMessage(error.message))}>
-                              {isExportingData ? <Loader2 className="mr-2 size-4 animate-spin" /> : <Download className="mr-2 size-4" />}
-                              Export data
-                            </Button>
-                            <Button variant="destructive" disabled={isDeletingData} onClick={() => deleteStoredData().catch((error: Error) => setErrorMessage(error.message))}>
-                              {isDeletingData ? <Loader2 className="mr-2 size-4 animate-spin" /> : <Trash2 className="mr-2 size-4" />}
-                              Delete stored data
-                            </Button>
+
+                          <div className="grid gap-4 xl:grid-cols-[1.1fr_0.9fr]">
+                            <Card className="overflow-hidden border-border/70 bg-background/55 shadow-none">
+                              <CardHeader>
+                                <CardTitle className="text-base">Recent activity</CardTitle>
+                                <CardDescription>The latest workspace events, translated into something easier to scan.</CardDescription>
+                              </CardHeader>
+                              <CardContent className="px-0">
+                                <div className="divide-y divide-border/70">
+                                  {usageActivity.slice(0, 8).map((item) => (
+                                    <div key={item.id} className="flex items-start gap-4 px-5 py-4">
+                                      <div className={joinClasses('mt-0.5 rounded-full border px-2 py-1 text-[11px] font-medium', activityAccentClass(item.type))}>
+                                        {item.type.split('.').at(0)}
+                                      </div>
+                                      <div className="min-w-0 flex-1">
+                                        <div className="flex flex-wrap items-center gap-x-3 gap-y-1">
+                                          <div className="text-sm font-medium">{formatActivityTypeLabel(item.type)}</div>
+                                          <div className="text-xs text-muted-foreground">{timeLabel(item.createdAt)}</div>
+                                        </div>
+                                        <div className="mt-1 text-sm text-muted-foreground">
+                                          {summarizeActivity(item)}
+                                        </div>
+                                      </div>
+                                    </div>
+                                  ))}
+                                  {!usageActivity.length ? (
+                                    <div className="px-5 py-8 text-sm text-muted-foreground">
+                                      Activity will show up here once the workspace starts recording usage events.
+                                    </div>
+                                  ) : null}
+                                </div>
+                              </CardContent>
+                            </Card>
+
+                            <Card className="overflow-hidden border-border/70 bg-background/55 shadow-none">
+                              <CardHeader>
+                                <CardTitle className="text-base">Data controls</CardTitle>
+                                <CardDescription>Take your data with you, or clear stored workspace history entirely.</CardDescription>
+                              </CardHeader>
+                              <CardContent className="space-y-4">
+                                <div className="rounded-md border border-border/70 bg-background/60 px-4 py-4">
+                                  <div className="text-sm font-medium">Export workspace data</div>
+                                  <p className="mt-1 text-sm text-muted-foreground">
+                                    Download your chats, settings, and saved workspace records as JSON.
+                                  </p>
+                                  <Button className="mt-4" variant="outline" disabled={isExportingData} onClick={() => exportStoredData().catch((error: Error) => setErrorMessage(error.message))}>
+                                    {isExportingData ? <Loader2 className="mr-2 size-4 animate-spin" /> : <Download className="mr-2 size-4" />}
+                                    Export data
+                                  </Button>
+                                </div>
+
+                                <div className="rounded-md border border-destructive/25 bg-destructive/6 px-4 py-4 dark:border-destructive/30 dark:bg-destructive/8">
+                                  <div className="text-sm font-medium text-foreground">Delete stored data</div>
+                                  <p className="mt-1 text-sm text-muted-foreground">
+                                    Remove chats, folders, and stored workspace records for this account.
+                                  </p>
+                                  <Button className="mt-4" variant="destructive" disabled={isDeletingData} onClick={() => deleteStoredData().catch((error: Error) => setErrorMessage(error.message))}>
+                                    {isDeletingData ? <Loader2 className="mr-2 size-4 animate-spin" /> : <Trash2 className="mr-2 size-4" />}
+                                    Delete stored data
+                                  </Button>
+                                </div>
+                              </CardContent>
+                            </Card>
                           </div>
                         </section>
+                        ) : null}
 
-                        <Separator />
-
+                        {settingsSection === 'premium' ? (
                         <section className="space-y-4">
-                          <div>
-                            <h3 className="text-sm font-medium">Premium</h3>
-                            <p className="mt-1 text-xs text-muted-foreground">
-                              Free includes {dailyLimitLabel(workspace?.user.billing.dailyMessageLimit ?? 2)}. Premium raises the daily limit and stays tied to verified server billing state.
-                            </p>
-                          </div>
+                          <p className="text-xs text-muted-foreground">
+                            Free includes {dailyLimitLabel(workspace?.user.billing.dailyMessageLimit ?? 2)}. Premium raises the daily limit and stays tied to verified server billing state.
+                          </p>
                           <div className="grid gap-4 md:grid-cols-3">
                             <div className="border border-border bg-background/50 px-4 py-3">
                               <div className="text-xs text-muted-foreground">Plan</div>
@@ -2937,8 +3316,10 @@ ${renderMarkdown(markdown)}
                             )}
                           </div>
                         </section>
+                        ) : null}
                       </div>
-                    </CardContent>
+                      </div>
+                    </div>
                   </Card>
                 </motion.div>
               </>
