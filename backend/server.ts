@@ -237,6 +237,13 @@ Bun.serve({
     }
 
     try {
+      if (pathname === "/health" && req.method === "GET") {
+        return new Response("OK", {
+          status: 200,
+          headers: mergeHeaders(new Headers(headers), { "Content-Type": "text/plain; charset=utf-8" }),
+        });
+      }
+
       if (pathname === "/api/webhooks/razorpay" && req.method === "POST") {
         if (!billingEnabled()) {
           return json({ error: "Billing is not configured" }, 503, headers);

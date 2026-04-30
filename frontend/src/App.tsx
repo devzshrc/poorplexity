@@ -7,22 +7,31 @@ import {
   AlertCircle,
   Archive,
   ArrowLeft,
+  BarChart3,
+  BookOpenText,
+  Brain,
   Check,
+  ChevronRight,
   Copy,
   Download,
+  ExternalLink,
   FileCode2,
   FileText,
   Folder,
   FolderPlus,
   GitBranch,
   Globe,
+  LayoutTemplate,
   Loader2,
+  ListTree,
   LogIn,
   LogOut,
   MessageSquare,
   Moon,
   MoreHorizontal,
+  Network,
   PanelLeft,
+  PanelRightOpen,
   Pencil,
   Pin,
   Plus,
@@ -30,6 +39,7 @@ import {
   Search,
   Send,
   Settings,
+  Sparkle,
   Sparkles,
   Sliders,
   Square,
@@ -55,6 +65,7 @@ import { Textarea } from '@/components/ui/textarea'
 import { API_BASE_URL } from '@/lib/config'
 
 type ThemeMode = 'light' | 'dark'
+type ThemeToggleOrigin = { x: number; y: number }
 type RouteState = { kind: 'workspace' } | { kind: 'profile'; username: string }
 
 type PreferenceRecord = {
@@ -247,7 +258,55 @@ type SSEHandlers = {
 }
 
 type MainView = 'chat' | 'settings'
-type SettingsSection = 'profile' | 'defaults' | 'chat' | 'data' | 'premium'
+type SettingsSection = 'profile' | 'defaults' | 'memory' | 'chat' | 'data' | 'premium'
+type AnswerStylePreset = 'concise' | 'structured' | 'deep-dive'
+type SourceLayout = 'answer-first' | 'sources-first'
+type SlashCommandId = 'summarize' | 'compare' | 'plan' | 'research' | 'rewrite'
+
+type UsageDashboardPayload = {
+  sentToday: number
+  remainingToday: number | null
+  dailyLimit: number | null
+  totalChats: number
+  archivedChats: number
+  pinnedChats: number
+  branchChats: number
+  totalMessages: number
+  userMessages: number
+  assistantMessages: number
+  webSearchReplies: number
+  sourcedReplies: number
+  folderCount: number
+  averageMessagesPerChat: number
+  topChats: Array<{
+    id: string
+    title: string
+    messageCount: number
+    updatedAt: string
+    branchFromChatId: string | null
+  }>
+  topFolders: Array<{
+    id: string
+    name: string
+    chatCount: number
+  }>
+  topSourceDomains: Array<{
+    domain: string
+    count: number
+  }>
+  topTopics: Array<{
+    label: string
+    count: number
+  }>
+  recentDays: Array<{
+    key: string
+    count: number
+    prompts: number
+    replies: number
+    searches: number
+  }>
+  activity: UsageActivity[]
+}
 
 const MODEL_OPTIONS = [
   'llama-3.1-8b-instant',
@@ -378,6 +437,75 @@ function moneyLabel(amountPaise?: number | null, currency?: string | null) {
 function dailyLimitLabel(limit: number | null) {
   return limit === null ? 'Unlimited' : `${limit}/day`
 }
+
+function inferAnswerStyle(settings: Pick<PreferenceRecord, 'answerMode' | 'responseLength' | 'outputFormat'> | Pick<ChatSettings, 'answerMode' | 'responseLength' | 'outputFormat'>): AnswerStylePreset {
+  if (settings.answerMode === 'deep' || settings.responseLength === 'long') return 'deep-dive'
+  if (settings.answerMode === 'balanced' || settings.responseLength === 'medium') return 'structured'
+  return 'concise'
+}
+
+function applyAnswerStylePreset<T extends Pick<PreferenceRecord, 'answerMode' | 'responseLength' | 'outputFormat'> | Pick<ChatSettings, 'answerMode' | 'responseLength' | 'outputFormat'>>(
+  current: T,
+  preset: AnswerStylePreset,
+): T {
+  if (preset === 'deep-dive') {
+    return { ...current, answerMode: 'deep', responseLength: 'long', outputFormat: 'paragraphs' } as T
+  }
+  if (preset === 'structured') {
+    return { ...current, answerMode: 'balanced', responseLength: 'medium', outputFormat: 'bullets' } as T
+  }
+  return { ...current, answerMode: 'fast', responseLength: 'short', outputFormat: 'bullets' } as T
+}
+
+function memoryItemsFromNotes(notes: string) {
+  return notes
+    .split('\n')
+    .map((line) => line.replace(/^\s*[-*]\s*/, '').trim())
+    .filter(Boolean)
+}
+
+function notesFromMemoryItems(items: string[]) {
+  return items.map((item) => `- ${item.trim()}`).join('\n')
+}
+
+function normalizeTopicLabel(label: string) {
+  return label
+    .split('-')
+    .map((part) => part.charAt(0).toUpperCase() + part.slice(1))
+    .join(' ')
+}
+
+function extractSlashCommand(text: string): { command: SlashCommandId | null; content: string } {
+  const match = text.trimStart().match(/^\/(summarize|compare|plan|research|rewrite)\b/i)
+  if (!match) return { command: null, content: text }
+  const command = match[1].toLowerCase() as SlashCommandId
+  return {
+    command,
+    content: text.trimStart().slice(match[0].length).trim(),
+  }
+}
+
+function commandPrompt(command: SlashCommandId, content: string) {
+  if (command === 'summarize') return `Summarize this clearly with short sections, key points, and a bottom-line takeaway.\n\n${content}`
+  if (command === 'compare') return `Compare this clearly. Use a short answer first, then bullets for differences, tradeoffs, and best choice.\n\n${content}`
+  if (command === 'plan') return `Create a practical step-by-step plan. Keep it concrete, ordered, and easy to execute.\n\n${content}`
+  if (command === 'research') return `Research this thoroughly. Use strong structure with sections, evidence, and recommendations.\n\n${content}`
+  return `Rewrite this for clarity and polish. Keep the meaning, remove fluff, and improve structure.\n\n${content}`
+}
+
+const ANSWER_STYLE_OPTIONS: Array<{ id: AnswerStylePreset; label: string; description: string; icon: typeof Sparkle }> = [
+  { id: 'concise', label: 'Concise', description: 'Tight answer, short bullets, minimal detail.', icon: Sparkle },
+  { id: 'structured', label: 'Structured', description: 'Direct answer, sections, bullets, and annotations.', icon: LayoutTemplate },
+  { id: 'deep-dive', label: 'Deep dive', description: 'Longer synthesis with more context and reasoning.', icon: Brain },
+]
+
+const COMPOSER_COMMANDS: Array<{ id: SlashCommandId; label: string; hint: string; icon: typeof Sparkle }> = [
+  { id: 'summarize', label: '/summarize', hint: 'Turn anything into a crisp summary.', icon: BookOpenText },
+  { id: 'compare', label: '/compare', hint: 'Break options into tradeoffs.', icon: ListTree },
+  { id: 'plan', label: '/plan', hint: 'Generate a concrete action plan.', icon: ChevronRight },
+  { id: 'research', label: '/research', hint: 'Push for a deeper sourced answer.', icon: Network },
+  { id: 'rewrite', label: '/rewrite', hint: 'Polish text without changing meaning.', icon: Pencil },
+]
 
 function safeHostname(url: string) {
   try { return new URL(url).hostname.replace(/^www\./, '') }
@@ -539,13 +667,25 @@ async function consumeStream(res: Response, handlers: SSEHandlers, signal: Abort
   if (!signal.aborted) handlers.onDone()
 }
 
-function ThemeToggle({ theme, onToggle }: { theme: ThemeMode; onToggle: () => void }) {
+function ThemeToggle({
+  theme,
+  onToggle,
+}: {
+  theme: ThemeMode
+  onToggle: (origin: ThemeToggleOrigin) => void
+}) {
   return (
     <Button
       variant="outline"
       size="icon-sm"
       className="h-9 w-9"
-      onClick={onToggle}
+      onClick={(event) => {
+        const rect = event.currentTarget.getBoundingClientRect()
+        onToggle({
+          x: rect.left + rect.width / 2,
+          y: rect.top + rect.height / 2,
+        })
+      }}
       title={theme === 'dark' ? 'Switch to light mode' : 'Switch to dark mode'}
       aria-label={theme === 'dark' ? 'Switch to light mode' : 'Switch to dark mode'}
     >
@@ -576,19 +716,24 @@ function CitationsSkeleton() {
   )
 }
 
-function MessageSources({ sources }: { sources: Source[] }) {
+function MessageSources({
+  sources,
+  onOpenSource,
+}: {
+  sources: Source[]
+  onOpenSource?: (source: Source, index: number) => void
+}) {
   if (!sources.length) return null
   return (
     <div className="mt-4 grid gap-2 sm:grid-cols-2">
       {sources.slice(0, 6).map((source, idx) => {
         const fav = faviconUrl(source.url)
         return (
-          <a
+          <button
             key={source.url + idx}
-            href={source.url}
-            target="_blank"
-            rel="noreferrer"
-            className="premium-surface flex gap-2 border border-border px-3 py-2 text-xs transition-colors hover:bg-muted"
+            type="button"
+            onClick={() => onOpenSource?.(source, idx + 1)}
+            className="premium-surface flex gap-2 border border-border px-3 py-2 text-left text-xs transition-colors hover:bg-muted"
           >
             <span className="mt-0.5 inline-flex size-5 shrink-0 items-center justify-center overflow-hidden rounded bg-muted text-[10px] font-semibold text-muted-foreground">
               {fav ? <img src={fav} alt="" className="size-4" referrerPolicy="no-referrer" /> : idx + 1}
@@ -597,24 +742,31 @@ function MessageSources({ sources }: { sources: Source[] }) {
               <span className="line-clamp-2 block font-medium">{source.title || safeHostname(source.url)}</span>
               <span className="mt-1 block truncate text-muted-foreground">{safeHostname(source.url)}</span>
             </span>
-          </a>
+          </button>
         )
       })}
     </div>
   )
 }
 
-function CitationInline({ source, index }: { source: Source; index: number }) {
+function CitationInline({
+  source,
+  index,
+  onOpenSource,
+}: {
+  source: Source
+  index: number
+  onOpenSource?: (source: Source, index: number) => void
+}) {
   return (
     <span className="group relative inline-block">
-      <a
-        href={source.url}
-        target="_blank"
-        rel="noreferrer"
+      <button
+        type="button"
+        onClick={() => onOpenSource?.(source, index)}
         className="mx-0.5 inline-flex size-4 items-center justify-center rounded-full bg-muted align-text-top text-[10px] font-semibold leading-none text-foreground/80 no-underline transition-colors hover:bg-foreground hover:text-background"
       >
         {index}
-      </a>
+      </button>
       <span className="glass-soft pointer-events-none absolute bottom-full left-1/2 z-30 mb-1 hidden w-64 -translate-x-1/2 rounded-md border border-border p-3 text-left text-xs group-hover:block">
         <span className="flex items-center gap-2">
           {faviconUrl(source.url) ? (
@@ -775,7 +927,7 @@ function PublicProfilePage({
   username: string
   theme: ThemeMode
   onBack: () => void
-  onToggleTheme: () => void
+  onToggleTheme: (origin?: ThemeToggleOrigin) => void
 }) {
   const [profile, setProfile] = useState<PublicProfilePayload | null>(null)
   const [error, setError] = useState('')
@@ -902,7 +1054,7 @@ function PublicWorkspace({
   onToggleTheme,
 }: {
   theme: ThemeMode
-  onToggleTheme: () => void
+  onToggleTheme: (origin?: ThemeToggleOrigin) => void
 }) {
   const [composer, setComposer] = useState('')
   const [showAuth, setShowAuth] = useState(false)
@@ -1086,7 +1238,7 @@ function Workspace({
   navigateToProfile,
 }: {
   theme: ThemeMode
-  onToggleTheme: () => void
+  onToggleTheme: (origin?: ThemeToggleOrigin) => void
   navigateToProfile: (username: string) => void
 }) {
   const { getToken } = useAuth()
@@ -1146,6 +1298,11 @@ function Workspace({
   const [showUpgradePrompt, setShowUpgradePrompt] = useState(false)
   const [showToolsMenu, setShowToolsMenu] = useState(false)
   const [showSidebar, setShowSidebar] = useState(false)
+  const [sourceLayout, setSourceLayout] = useState<SourceLayout>('answer-first')
+  const [activeSource, setActiveSource] = useState<{ messageId: string; index: number; source: Source } | null>(null)
+  const [usageDashboard, setUsageDashboard] = useState<UsageDashboardPayload | null>(null)
+  const [isLoadingUsageDashboard, setIsLoadingUsageDashboard] = useState(false)
+  const [draftMemoryItem, setDraftMemoryItem] = useState('')
   const abortRef = useRef<AbortController | null>(null)
   const messagesEndRef = useRef<HTMLDivElement | null>(null)
   const toolsMenuRef = useRef<HTMLDivElement | null>(null)
@@ -1186,6 +1343,7 @@ function Workspace({
     if (!res.ok) throw new Error((await res.json().catch(() => ({ error: `HTTP ${res.status}` })) as { error?: string }).error ?? `HTTP ${res.status}`)
     const payload = await res.json() as WorkspacePayload
     setWorkspace(payload)
+    setUsageDashboard(null)
     setSelectedChatId((current) => {
       if (preserveSelection && current && [...payload.chats, ...payload.trash].some((chat) => chat.id === current)) return current
       return payload.chats[0]?.id ?? null
@@ -1215,7 +1373,15 @@ function Workspace({
       setComposer(draft)
       window.localStorage.removeItem('poorplexity-pending-draft')
     }
+    const storedSourceLayout = window.localStorage.getItem('poorplexity-source-layout')
+    if (storedSourceLayout === 'answer-first' || storedSourceLayout === 'sources-first') {
+      setSourceLayout(storedSourceLayout)
+    }
   }, [])
+
+  useEffect(() => {
+    window.localStorage.setItem('poorplexity-source-layout', sourceLayout)
+  }, [sourceLayout])
 
   useEffect(() => {
     if (!selectedChatId || chatCache[selectedChatId]) return
@@ -1292,12 +1458,80 @@ function Workspace({
     }
   }, [usage, usageActivity])
 
+  const memoryItems = useMemo(() => memoryItemsFromNotes(preferenceForm.memoryNotes), [preferenceForm.memoryNotes])
+
+  const branchInsights = useMemo(() => {
+    if (!selectedChat) return null
+    const parent = selectedChat.branchFromChatId
+      ? chats.find((chat) => chat.id === selectedChat.branchFromChatId) ?? null
+      : null
+    const children = chats.filter((chat) => chat.branchFromChatId === selectedChat.id)
+    return {
+      parent,
+      children,
+      siblingCount: parent ? chats.filter((chat) => chat.branchFromChatId === parent.id).length : 0,
+    }
+  }, [selectedChat, chats])
+
+  const currentAnswerStyle = inferAnswerStyle(chatSettingsForm)
+  const defaultAnswerStyle = inferAnswerStyle(preferenceForm)
+
+  const openSourceViewer = (messageId: string, source: Source, index: number) => {
+    setActiveSource({ messageId, source, index })
+  }
+
+  const addMemoryItem = () => {
+    const next = draftMemoryItem.trim()
+    if (!next) return
+    setPreferenceForm((current) => ({
+      ...current,
+      memoryNotes: notesFromMemoryItems([...memoryItemsFromNotes(current.memoryNotes), next]),
+    }))
+    setDraftMemoryItem('')
+  }
+
+  const removeMemoryItem = (item: string) => {
+    setPreferenceForm((current) => ({
+      ...current,
+      memoryNotes: notesFromMemoryItems(memoryItemsFromNotes(current.memoryNotes).filter((entry) => entry !== item)),
+    }))
+  }
+
+  const applyCommandChip = (command: SlashCommandId) => {
+    setComposer((current) => {
+      const trimmed = current.trim()
+      return trimmed ? `/${command} ${trimmed}` : `/${command} `
+    })
+    if (command === 'research') setComposerUseWebSearch(true)
+    composerRef.current?.focus()
+  }
+
   useEffect(() => {
     if (selectedChat?.settings) {
       setChatSettingsForm(clone(selectedChat.settings))
       setComposerUseWebSearch(selectedChat.settings.useWebSearch)
     }
   }, [selectedChat?.id, selectedChat?.settings])
+
+  useEffect(() => {
+    if (settingsSection !== 'data' || usageDashboard || isLoadingUsageDashboard) return
+    setIsLoadingUsageDashboard(true)
+    authorizedFetch('/api/settings/usage')
+      .then(async (res) => {
+        if (!res.ok) throw new Error((await res.json().catch(() => ({ error: `HTTP ${res.status}` })) as { error?: string }).error ?? `HTTP ${res.status}`)
+        return await res.json() as UsageDashboardPayload
+      })
+      .then((payload) => setUsageDashboard(payload))
+      .catch((error: Error) => setErrorMessage(error.message))
+      .finally(() => setIsLoadingUsageDashboard(false))
+  }, [settingsSection, usageDashboard, isLoadingUsageDashboard])
+
+  useEffect(() => {
+    setActiveSource((current) => {
+      if (!current || !selectedChat) return current
+      return selectedChat.messages.some((message) => message.id === current.messageId) ? current : null
+    })
+  }, [selectedChat])
 
   useEffect(() => {
     messagesEndRef.current?.scrollIntoView({ block: 'end' })
@@ -1607,7 +1841,11 @@ function Workspace({
   }
 
   const sendMessage = async (seed?: string) => {
-    const content = (seed ?? composer).trim()
+    const rawInput = (seed ?? composer).trim()
+    const parsedCommand = extractSlashCommand(rawInput)
+    const content = parsedCommand.command
+      ? commandPrompt(parsedCommand.command, parsedCommand.content || 'Use the current chat context.')
+      : rawInput
     if (!content || isSending) return
     const previousComposer = composer
     let activeChatId: string | null = selectedChatId
@@ -1636,7 +1874,10 @@ function Workspace({
       const res = await authorizedFetch(`/api/chats/${activeChatId}/messages`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ content, useWebSearch: composerUseWebSearch }),
+        body: JSON.stringify({
+          content,
+          useWebSearch: parsedCommand.command === 'research' ? true : composerUseWebSearch,
+        }),
         signal: controller.signal,
       })
       if (!res.ok || !res.body) {
@@ -1661,7 +1902,7 @@ function Workspace({
             },
           }
         })
-        setComposer(seed ? previousComposer : content)
+        setComposer(seed ? previousComposer : rawInput)
         setErrorMessage(error instanceof Error ? error.message : String(error))
       }
     } finally {
@@ -2562,11 +2803,71 @@ ${renderMarkdown(markdown)}
           {selectedChat ? (
             <>
               <div className="flex-1 overflow-visible lg:min-h-0 lg:overflow-y-auto">
-                <div className="mx-auto flex w-full max-w-[1120px] flex-col gap-5 px-5 py-5">
+                <div className={joinClasses('mx-auto flex w-full gap-5 px-5 py-5', activeSource ? 'max-w-[1380px] xl:flex-row' : 'max-w-[1120px] flex-col')}>
+                  <div className="min-w-0 flex-1">
+                  <div className="flex flex-col gap-5">
                   {selectedChat.summary ? (
                     <Card className="max-w-[56rem] shadow-none">
                       <CardHeader><CardTitle className="text-base">Conversation summary</CardTitle></CardHeader>
                       <CardContent><p className="whitespace-pre-wrap text-sm leading-6 text-muted-foreground">{selectedChat.summary}</p></CardContent>
+                    </Card>
+                  ) : null}
+
+                  {branchInsights && (branchInsights.parent || branchInsights.children.length) ? (
+                    <Card className="max-w-[56rem] border-border/70 bg-background/60 shadow-none">
+                      <CardHeader>
+                        <CardTitle className="flex items-center gap-2 text-base">
+                          <GitBranch className="size-4" />
+                          Conversation branches
+                        </CardTitle>
+                        <CardDescription>See where this thread came from and what it has already spawned.</CardDescription>
+                      </CardHeader>
+                      <CardContent className="grid gap-3 md:grid-cols-2">
+                        <div className="rounded-md border border-border/70 bg-background/60 px-4 py-3">
+                          <div className="text-[11px] font-medium uppercase tracking-[0.08em] text-muted-foreground">Parent</div>
+                          {branchInsights.parent ? (
+                            <button
+                              type="button"
+                              onClick={() => { setSelectedChatId(branchInsights.parent!.id); setMainView('chat') }}
+                              className="mt-2 flex w-full items-center justify-between text-left"
+                            >
+                              <div>
+                                <div className="text-sm font-medium">{branchInsights.parent.title}</div>
+                                <div className="mt-1 text-xs text-muted-foreground">{branchInsights.parent.messageCount} messages</div>
+                              </div>
+                              <ChevronRight className="size-4 text-muted-foreground" />
+                            </button>
+                          ) : (
+                            <div className="mt-2 text-sm text-muted-foreground">This is the root conversation.</div>
+                          )}
+                        </div>
+                        <div className="rounded-md border border-border/70 bg-background/60 px-4 py-3">
+                          <div className="flex items-center justify-between gap-3">
+                            <div className="text-[11px] font-medium uppercase tracking-[0.08em] text-muted-foreground">Child branches</div>
+                            <Badge variant="outline">{branchInsights.children.length}</Badge>
+                          </div>
+                          {branchInsights.children.length ? (
+                            <div className="mt-2 space-y-2">
+                              {branchInsights.children.slice(0, 3).map((child) => (
+                                <button
+                                  key={child.id}
+                                  type="button"
+                                  onClick={() => { setSelectedChatId(child.id); setMainView('chat') }}
+                                  className="flex w-full items-center justify-between rounded-md border border-border/70 bg-background px-3 py-2 text-left hover:bg-muted"
+                                >
+                                  <div className="min-w-0">
+                                    <div className="truncate text-sm font-medium">{child.title}</div>
+                                    <div className="mt-1 text-xs text-muted-foreground">{child.messageCount} messages</div>
+                                  </div>
+                                  <ChevronRight className="size-4 shrink-0 text-muted-foreground" />
+                                </button>
+                              ))}
+                            </div>
+                          ) : (
+                            <div className="mt-2 text-sm text-muted-foreground">No branches yet from this point.</div>
+                          )}
+                        </div>
+                      </CardContent>
                     </Card>
                   ) : null}
 
@@ -2609,6 +2910,12 @@ ${renderMarkdown(markdown)}
                           {confidenceLabel(message.confidence) ? <Badge variant="outline">{confidenceLabel(message.confidence)}</Badge> : null}
                           {isStreamingMessage ? <Badge variant="outline">Typing</Badge> : null}
                         </div>
+                        {message.role === 'assistant' && sourceLayout === 'sources-first' && message.sources?.length ? (
+                          <MessageSources
+                            sources={message.sources}
+                            onOpenSource={(source, sourceIndex) => openSourceViewer(message.id, source, sourceIndex)}
+                          />
+                        ) : null}
                         {message.role === 'assistant' ? (
                           message.content ? (
                             <div className={joinClasses('prose-answer', isStreamingMessage && 'streaming-answer')} aria-live={isStreamingMessage ? 'polite' : undefined}>
@@ -2619,7 +2926,7 @@ ${renderMarkdown(markdown)}
                                     if (href?.startsWith('cite-')) {
                                       const idx = Number(href.slice(5))
                                       const source = message.sources?.[idx - 1]
-                                      if (source) return <CitationInline source={source} index={idx} />
+                                      if (source) return <CitationInline source={source} index={idx} onOpenSource={(currentSource, sourceIndex) => openSourceViewer(message.id, currentSource, sourceIndex)} />
                                     }
                                     return <a href={href} target="_blank" rel="noreferrer" {...rest}>{children}</a>
                                   },
@@ -2649,8 +2956,8 @@ ${renderMarkdown(markdown)}
                             </ul>
                           </div>
                         ) : null}
-                        {message.sources?.length
-                          ? <MessageSources sources={message.sources} />
+                        {message.sources?.length && sourceLayout === 'answer-first'
+                          ? <MessageSources sources={message.sources} onOpenSource={(source, sourceIndex) => openSourceViewer(message.id, source, sourceIndex)} />
                           : (message.role === 'assistant'
                               && isSending
                               && selectedChat.messages.at(-1)?.id === message.id
@@ -2720,6 +3027,54 @@ ${renderMarkdown(markdown)}
                     ))}
                     <div ref={messagesEndRef} />
                   </motion.div>
+                  </div>
+                  </div>
+                  {activeSource ? (
+                    <aside className="w-full shrink-0 xl:sticky xl:top-5 xl:w-[340px] xl:self-start">
+                      <Card className="border-border/70 bg-background shadow-none">
+                        <CardHeader className="gap-3">
+                          <div className="flex items-start justify-between gap-3">
+                            <div className="min-w-0">
+                              <CardTitle className="text-base">Source {activeSource.index}</CardTitle>
+                              <CardDescription className="mt-1 truncate">{safeHostname(activeSource.source.url)}</CardDescription>
+                            </div>
+                            <Button variant="ghost" size="icon-sm" title="Close source panel" onClick={() => setActiveSource(null)}>
+                              <X className="size-4" />
+                            </Button>
+                          </div>
+                          <div className="flex items-center gap-2">
+                            <Button variant="outline" size="sm" className="flex-1 justify-center" onClick={() => window.open(activeSource.source.url, '_blank', 'noopener,noreferrer')}>
+                              <ExternalLink className="mr-2 size-3.5" />
+                              Open source
+                            </Button>
+                            <Button
+                              variant={sourceLayout === 'sources-first' ? 'secondary' : 'outline'}
+                              size="sm"
+                              onClick={() => setSourceLayout((current) => current === 'answer-first' ? 'sources-first' : 'answer-first')}
+                            >
+                              <PanelRightOpen className="mr-2 size-3.5" />
+                              {sourceLayout === 'answer-first' ? 'Sources first' : 'Answer first'}
+                            </Button>
+                          </div>
+                        </CardHeader>
+                        <CardContent className="space-y-4">
+                          <div className="rounded-md border border-border/70 bg-background/60 px-4 py-3">
+                            <div className="text-sm font-medium leading-6">{activeSource.source.title || safeHostname(activeSource.source.url)}</div>
+                            <div className="mt-2 text-xs text-muted-foreground">{activeSource.source.url}</div>
+                          </div>
+                          <div className="rounded-md border border-border/70 bg-background/60 px-4 py-3 text-sm leading-6 text-muted-foreground">
+                            {activeSource.source.content || 'No snippet was returned for this source, but the linked page is still attached to the answer.'}
+                          </div>
+                          <div className="rounded-md border border-border/70 bg-background/60 px-4 py-3">
+                            <div className="text-[11px] font-medium uppercase tracking-[0.08em] text-muted-foreground">Why it matters</div>
+                            <p className="mt-2 text-sm text-muted-foreground">
+                              This panel keeps the evidence and the answer visible in one place, so users can verify claims without leaving the thread.
+                            </p>
+                          </div>
+                        </CardContent>
+                      </Card>
+                    </aside>
+                  ) : null}
                 </div>
               </div>
 
@@ -2770,6 +3125,28 @@ ${renderMarkdown(markdown)}
                     placeholder={editingMessageId ? 'Update that earlier message and resend.' : 'Ask a follow-up. ⌘K new chat · ⌘/ focus · ↑ edit last · Esc stop. Shift+Enter for a new line.'}
                     className="min-h-[9rem] max-h-40 px-4 py-3"
                   />
+                  <div className="mt-3 flex flex-wrap items-center gap-2">
+                    {COMPOSER_COMMANDS.map((command) => {
+                      const Icon = command.icon
+                      return (
+                        <Button
+                          key={command.id}
+                          type="button"
+                          variant="outline"
+                          size="sm"
+                          className="h-8"
+                          title={command.hint}
+                          onClick={() => applyCommandChip(command.id)}
+                        >
+                          <Icon className="mr-2 size-3.5" />
+                          {command.label}
+                        </Button>
+                      )
+                    })}
+                    <Badge variant="outline" className="h-8 px-3 text-[11px] sm:text-xs">
+                      {ANSWER_STYLE_OPTIONS.find((option) => option.id === currentAnswerStyle)?.label ?? 'Structured'} mode
+                    </Badge>
+                  </div>
                   <div className="mt-3 flex flex-col gap-2 sm:flex-row sm:flex-wrap sm:items-center sm:justify-between">
                     <div className="flex flex-col gap-2 text-[11px] text-muted-foreground sm:flex-row sm:flex-wrap sm:items-center sm:gap-3 sm:text-xs">
                       <label className="flex items-center gap-2">
@@ -2861,6 +3238,7 @@ ${renderMarkdown(markdown)}
                       {([
                         { id: 'profile' as const, label: 'Profile', icon: User },
                         { id: 'defaults' as const, label: 'Defaults', icon: Sliders },
+                        { id: 'memory' as const, label: 'Memory', icon: Brain },
                         { id: 'chat' as const, label: 'Current chat', icon: MessageSquare },
                         { id: 'data' as const, label: 'Data & usage', icon: Database },
                         { id: 'premium' as const, label: 'Billing', icon: CreditCard },
@@ -2899,6 +3277,7 @@ ${renderMarkdown(markdown)}
                           <h2 className="text-lg font-semibold tracking-tight">{
                             settingsSection === 'profile' ? 'Profile'
                               : settingsSection === 'defaults' ? 'Defaults'
+                              : settingsSection === 'memory' ? 'Memory'
                               : settingsSection === 'chat' ? 'Current chat'
                               : settingsSection === 'data' ? 'Data & usage'
                               : 'Billing'
@@ -2906,6 +3285,7 @@ ${renderMarkdown(markdown)}
                           <p className="mt-1 text-xs text-muted-foreground sm:text-sm">{
                             settingsSection === 'profile' ? 'Manage your public identity and profile details.'
                               : settingsSection === 'defaults' ? 'Set how new chats should behave before you start typing.'
+                              : settingsSection === 'memory' ? 'Keep reusable context tidy, editable, and easy to trust.'
                               : settingsSection === 'chat' ? 'Settings that apply only to the chat you have open right now.'
                               : settingsSection === 'data' ? 'Track your quota and manage the data we store for your workspace.'
                               : 'Plan, status, and subscription management.'
@@ -2953,6 +3333,29 @@ ${renderMarkdown(markdown)}
 
                         {settingsSection === 'defaults' ? (
                         <section className="space-y-4">
+                          <div className="grid gap-3 lg:grid-cols-3">
+                            {ANSWER_STYLE_OPTIONS.map((option) => {
+                              const Icon = option.icon
+                              const active = defaultAnswerStyle === option.id
+                              return (
+                                <button
+                                  key={option.id}
+                                  type="button"
+                                  onClick={() => setPreferenceForm((current) => applyAnswerStylePreset(current, option.id))}
+                                  className={joinClasses(
+                                    'rounded-md border px-4 py-4 text-left transition-colors',
+                                    active ? 'border-foreground bg-muted' : 'border-border bg-background hover:bg-muted/60',
+                                  )}
+                                >
+                                  <div className="flex items-center gap-2">
+                                    <Icon className="size-4 text-muted-foreground" />
+                                    <div className="text-sm font-medium">{option.label}</div>
+                                  </div>
+                                  <div className="mt-2 text-sm leading-6 text-muted-foreground">{option.description}</div>
+                                </button>
+                              )
+                            })}
+                          </div>
                           <div className="grid gap-4 md:grid-cols-2">
                             <div className="grid gap-2">
                               <label className="text-sm font-medium">Roast level</label>
@@ -3002,10 +3405,6 @@ ${renderMarkdown(markdown)}
                               <span>Only answer from sources by default</span>
                               <Switch checked={preferenceForm.onlyFromSources} onCheckedChange={(checked) => setPreferenceForm((current) => ({ ...current, onlyFromSources: checked }))} ariaLabel="Only answer from sources by default" />
                             </label>
-                            <div className="grid gap-2 md:col-span-2">
-                              <label className="text-sm font-medium">Reusable memory</label>
-                              <Textarea value={preferenceForm.memoryNotes} onChange={(event) => setPreferenceForm((current) => ({ ...current, memoryNotes: event.target.value }))} className="min-h-24" />
-                            </div>
                             <div className="md:col-span-2 flex justify-end">
                               <Button disabled={isSavingPreferences} onClick={() => savePreferences().catch((error: Error) => setErrorMessage(error.message))}>
                                 {isSavingPreferences ? <Loader2 className="mr-2 size-4 animate-spin" /> : null}
@@ -3016,10 +3415,90 @@ ${renderMarkdown(markdown)}
                         </section>
                         ) : null}
 
+                        {settingsSection === 'memory' ? (
+                        <section className="space-y-5">
+                          <Card className="border-border/70 bg-background/55 shadow-none">
+                            <CardHeader>
+                              <CardTitle className="text-base">Reusable memory</CardTitle>
+                              <CardDescription>Store stable facts, preferences, and instructions you want the assistant to reuse across chats.</CardDescription>
+                            </CardHeader>
+                            <CardContent className="space-y-4">
+                              <div className="flex gap-2">
+                                <Input
+                                  value={draftMemoryItem}
+                                  onChange={(event) => setDraftMemoryItem(event.target.value)}
+                                  placeholder="Example: Prefer concise answers with implementation details."
+                                  onKeyDown={(event) => {
+                                    if (event.key === 'Enter') {
+                                      event.preventDefault()
+                                      addMemoryItem()
+                                    }
+                                  }}
+                                />
+                                <Button type="button" onClick={addMemoryItem}>
+                                  <Plus className="mr-2 size-4" />
+                                  Add
+                                </Button>
+                              </div>
+                              <div className="grid gap-2">
+                                {memoryItems.length ? memoryItems.map((item) => (
+                                  <div key={item} className="flex items-start justify-between gap-3 rounded-md border border-border/70 bg-background/60 px-4 py-3">
+                                    <div className="min-w-0">
+                                      <div className="text-sm font-medium">{item}</div>
+                                      <div className="mt-1 text-xs text-muted-foreground">Injected into future answers as reusable context.</div>
+                                    </div>
+                                    <Button variant="ghost" size="icon-xs" title="Remove memory item" onClick={() => removeMemoryItem(item)}>
+                                      <Trash2 className="size-3.5" />
+                                    </Button>
+                                  </div>
+                                )) : (
+                                  <div className="rounded-md border border-dashed border-border bg-background/50 px-4 py-4 text-sm text-muted-foreground">
+                                    No reusable memory saved yet. Add a few durable preferences, not temporary task notes.
+                                  </div>
+                                )}
+                              </div>
+                              <div className="grid gap-2">
+                                <label className="text-sm font-medium">Raw memory notes</label>
+                                <Textarea value={preferenceForm.memoryNotes} onChange={(event) => setPreferenceForm((current) => ({ ...current, memoryNotes: event.target.value }))} className="min-h-28" />
+                              </div>
+                              <div className="flex justify-end">
+                                <Button disabled={isSavingPreferences} onClick={() => savePreferences().catch((error: Error) => setErrorMessage(error.message))}>
+                                  {isSavingPreferences ? <Loader2 className="mr-2 size-4 animate-spin" /> : null}
+                                  Save memory
+                                </Button>
+                              </div>
+                            </CardContent>
+                          </Card>
+                        </section>
+                        ) : null}
+
                         {settingsSection === 'chat' ? (
                         <section className="space-y-4">
                           {selectedChat ? (
                             <div className="grid gap-4 md:grid-cols-2">
+                              <div className="grid gap-3 md:col-span-2 lg:grid-cols-3">
+                                {ANSWER_STYLE_OPTIONS.map((option) => {
+                                  const Icon = option.icon
+                                  const active = currentAnswerStyle === option.id
+                                  return (
+                                    <button
+                                      key={option.id}
+                                      type="button"
+                                      onClick={() => setChatSettingsForm((current) => applyAnswerStylePreset(current, option.id))}
+                                      className={joinClasses(
+                                        'rounded-md border px-4 py-4 text-left transition-colors',
+                                        active ? 'border-foreground bg-muted' : 'border-border bg-background hover:bg-muted/60',
+                                      )}
+                                    >
+                                      <div className="flex items-center gap-2">
+                                        <Icon className="size-4 text-muted-foreground" />
+                                        <div className="text-sm font-medium">{option.label}</div>
+                                      </div>
+                                      <div className="mt-2 text-sm leading-6 text-muted-foreground">{option.description}</div>
+                                    </button>
+                                  )
+                                })}
+                              </div>
                               <div className="grid gap-2">
                                 <label className="text-sm font-medium">Folder</label>
                                 <Select value={currentFolderId ?? 'none'} onChange={(event) => moveChatToFolder(event.target.value === 'none' ? null : event.target.value).catch((error: Error) => setErrorMessage(error.message))}>
@@ -3075,6 +3554,10 @@ ${renderMarkdown(markdown)}
                               <label className="flex items-center justify-between gap-3 border border-border bg-background/50 px-3 py-3 text-sm">
                                 <span>Only answer from sources</span>
                                 <Switch checked={chatSettingsForm.onlyFromSources} onCheckedChange={(checked) => setChatSettingsForm((current) => ({ ...current, onlyFromSources: checked }))} ariaLabel="Only answer from sources" />
+                              </label>
+                              <label className="flex items-center justify-between gap-3 border border-border bg-background/50 px-3 py-3 text-sm">
+                                <span>Source cards before answer</span>
+                                <Switch checked={sourceLayout === 'sources-first'} onCheckedChange={(checked) => setSourceLayout(checked ? 'sources-first' : 'answer-first')} ariaLabel="Show sources before answer" />
                               </label>
                               <div className="grid gap-2 md:col-span-2">
                                 <label className="text-sm font-medium">Per-chat instructions</label>
@@ -3189,6 +3672,80 @@ ${renderMarkdown(markdown)}
                             </Card>
                           </div>
 
+                          {usageDashboard ? (
+                            <div className="grid gap-4 xl:grid-cols-[1.05fr_0.95fr]">
+                              <Card className="overflow-hidden border-border/70 bg-background/55 shadow-none">
+                                <CardHeader>
+                                  <CardTitle className="flex items-center gap-2 text-base">
+                                    <BarChart3 className="size-4" />
+                                    Insights snapshot
+                                  </CardTitle>
+                                  <CardDescription>High-level product signals that help users understand how they work here.</CardDescription>
+                                </CardHeader>
+                                <CardContent className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
+                                  {[
+                                    { label: 'Avg/chat', value: usageDashboard.averageMessagesPerChat },
+                                    { label: 'Pinned', value: usageDashboard.pinnedChats },
+                                    { label: 'Branches', value: usageDashboard.branchChats },
+                                    { label: 'Sourced replies', value: usageDashboard.sourcedReplies },
+                                  ].map((metric) => (
+                                    <div key={metric.label} className="rounded-md border border-border/70 bg-background/60 px-4 py-3">
+                                      <div className="text-[11px] text-muted-foreground">{metric.label}</div>
+                                      <div className="mt-1 text-xl font-semibold">{metric.value}</div>
+                                    </div>
+                                  ))}
+                                </CardContent>
+                              </Card>
+
+                              <Card className="overflow-hidden border-border/70 bg-background/55 shadow-none">
+                                <CardHeader>
+                                  <CardTitle className="flex items-center gap-2 text-base">
+                                    <Network className="size-4" />
+                                    Source intelligence
+                                  </CardTitle>
+                                  <CardDescription>Which domains and topics are driving the workspace most often.</CardDescription>
+                                </CardHeader>
+                                <CardContent className="grid gap-4 md:grid-cols-2">
+                                  <div className="space-y-2">
+                                    <div className="text-[11px] font-medium uppercase tracking-[0.08em] text-muted-foreground">Top domains</div>
+                                    <div className="space-y-2">
+                                      {usageDashboard.topSourceDomains.length ? usageDashboard.topSourceDomains.map((item) => (
+                                        <div key={item.domain} className="flex items-center justify-between rounded-md border border-border/70 bg-background/60 px-3 py-2">
+                                          <div className="truncate text-sm">{item.domain}</div>
+                                          <Badge variant="outline">{item.count}</Badge>
+                                        </div>
+                                      )) : (
+                                        <div className="rounded-md border border-dashed border-border px-3 py-3 text-sm text-muted-foreground">
+                                          No source domains yet. This fills in once more web-backed answers land.
+                                        </div>
+                                      )}
+                                    </div>
+                                  </div>
+                                  <div className="space-y-2">
+                                    <div className="text-[11px] font-medium uppercase tracking-[0.08em] text-muted-foreground">Recurring topics</div>
+                                    <div className="flex flex-wrap gap-2">
+                                      {usageDashboard.topTopics.length ? usageDashboard.topTopics.map((topic) => (
+                                        <Badge key={topic.label} variant="outline">{normalizeTopicLabel(topic.label)} · {topic.count}</Badge>
+                                      )) : (
+                                        <div className="rounded-md border border-dashed border-border px-3 py-3 text-sm text-muted-foreground">
+                                          Topic clustering grows as more chats accumulate.
+                                        </div>
+                                      )}
+                                    </div>
+                                  </div>
+                                </CardContent>
+                              </Card>
+                            </div>
+                          ) : isLoadingUsageDashboard ? (
+                            <Card className="overflow-hidden border-border/70 bg-background/55 shadow-none">
+                              <CardContent className="grid gap-4 px-5 py-5 md:grid-cols-3">
+                                <Skeleton className="h-24 w-full" />
+                                <Skeleton className="h-24 w-full" />
+                                <Skeleton className="h-24 w-full" />
+                              </CardContent>
+                            </Card>
+                          ) : null}
+
                           <div className="grid gap-4 xl:grid-cols-[1.1fr_0.9fr]">
                             <Card className="overflow-hidden border-border/70 bg-background/55 shadow-none">
                               <CardHeader>
@@ -3197,7 +3754,7 @@ ${renderMarkdown(markdown)}
                               </CardHeader>
                               <CardContent className="px-0">
                                 <div className="divide-y divide-border/70">
-                                  {usageActivity.slice(0, 8).map((item) => (
+                                  {(usageDashboard?.activity ?? usageActivity).slice(0, 8).map((item) => (
                                     <div key={item.id} className="flex items-start gap-4 px-5 py-4">
                                       <div className={joinClasses('mt-0.5 rounded-full border px-2 py-1 text-[11px] font-medium', activityAccentClass(item.type))}>
                                         {item.type.split('.').at(0)}
@@ -3213,7 +3770,7 @@ ${renderMarkdown(markdown)}
                                       </div>
                                     </div>
                                   ))}
-                                  {!usageActivity.length ? (
+                                  {!(usageDashboard?.activity ?? usageActivity).length ? (
                                     <div className="px-5 py-8 text-sm text-muted-foreground">
                                       Activity will show up here once the workspace starts recording usage events.
                                     </div>
@@ -3224,34 +3781,73 @@ ${renderMarkdown(markdown)}
 
                             <Card className="overflow-hidden border-border/70 bg-background/55 shadow-none">
                               <CardHeader>
-                                <CardTitle className="text-base">Data controls</CardTitle>
-                                <CardDescription>Take your data with you, or clear stored workspace history entirely.</CardDescription>
+                                <CardTitle className="text-base">Workspace leaders</CardTitle>
+                                <CardDescription>Chats and folders carrying the most activity right now.</CardDescription>
                               </CardHeader>
                               <CardContent className="space-y-4">
-                                <div className="rounded-md border border-border/70 bg-background/60 px-4 py-4">
-                                  <div className="text-sm font-medium">Export workspace data</div>
-                                  <p className="mt-1 text-sm text-muted-foreground">
-                                    Download your chats, settings, and saved workspace records as JSON.
-                                  </p>
-                                  <Button className="mt-4" variant="outline" disabled={isExportingData} onClick={() => exportStoredData().catch((error: Error) => setErrorMessage(error.message))}>
-                                    {isExportingData ? <Loader2 className="mr-2 size-4 animate-spin" /> : <Download className="mr-2 size-4" />}
-                                    Export data
-                                  </Button>
+                                <div className="space-y-2">
+                                  <div className="text-[11px] font-medium uppercase tracking-[0.08em] text-muted-foreground">Top chats</div>
+                                  {(usageDashboard?.topChats ?? []).map((chat) => (
+                                    <button
+                                      key={chat.id}
+                                      type="button"
+                                      onClick={() => { setSelectedChatId(chat.id); setMainView('chat') }}
+                                      className="flex w-full items-center justify-between rounded-md border border-border/70 bg-background/60 px-3 py-3 text-left hover:bg-muted"
+                                    >
+                                      <div className="min-w-0">
+                                        <div className="truncate text-sm font-medium">{chat.title}</div>
+                                        <div className="mt-1 text-xs text-muted-foreground">{chat.messageCount} messages · Updated {timeLabel(chat.updatedAt)}</div>
+                                      </div>
+                                      {chat.branchFromChatId ? <GitBranch className="size-4 shrink-0 text-muted-foreground" /> : null}
+                                    </button>
+                                  ))}
                                 </div>
-
-                                <div className="rounded-md border border-destructive/25 bg-destructive/6 px-4 py-4 dark:border-destructive/30 dark:bg-destructive/8">
-                                  <div className="text-sm font-medium text-foreground">Delete stored data</div>
-                                  <p className="mt-1 text-sm text-muted-foreground">
-                                    Remove chats, folders, and stored workspace records for this account.
-                                  </p>
-                                  <Button className="mt-4" variant="destructive" disabled={isDeletingData} onClick={() => deleteStoredData().catch((error: Error) => setErrorMessage(error.message))}>
-                                    {isDeletingData ? <Loader2 className="mr-2 size-4 animate-spin" /> : <Trash2 className="mr-2 size-4" />}
-                                    Delete stored data
-                                  </Button>
+                                <div className="space-y-2">
+                                  <div className="text-[11px] font-medium uppercase tracking-[0.08em] text-muted-foreground">Top folders</div>
+                                  {(usageDashboard?.topFolders ?? []).length ? (usageDashboard?.topFolders ?? []).map((folder) => (
+                                    <div key={folder.id} className="flex items-center justify-between rounded-md border border-border/70 bg-background/60 px-3 py-2">
+                                      <div className="truncate text-sm">{folder.name}</div>
+                                      <Badge variant="outline">{folder.chatCount}</Badge>
+                                    </div>
+                                  )) : (
+                                    <div className="rounded-md border border-dashed border-border px-3 py-3 text-sm text-muted-foreground">
+                                      Folder leaders appear here once chats are filed.
+                                    </div>
+                                  )}
                                 </div>
                               </CardContent>
                             </Card>
                           </div>
+
+                          <Card className="overflow-hidden border-border/70 bg-background/55 shadow-none">
+                            <CardHeader>
+                              <CardTitle className="text-base">Data controls</CardTitle>
+                              <CardDescription>Take your data with you, or clear stored workspace history entirely.</CardDescription>
+                            </CardHeader>
+                            <CardContent className="grid gap-4 md:grid-cols-2">
+                              <div className="rounded-md border border-border/70 bg-background/60 px-4 py-4">
+                                <div className="text-sm font-medium">Export workspace data</div>
+                                <p className="mt-1 text-sm text-muted-foreground">
+                                  Download your chats, settings, and saved workspace records as JSON.
+                                </p>
+                                <Button className="mt-4" variant="outline" disabled={isExportingData} onClick={() => exportStoredData().catch((error: Error) => setErrorMessage(error.message))}>
+                                  {isExportingData ? <Loader2 className="mr-2 size-4 animate-spin" /> : <Download className="mr-2 size-4" />}
+                                  Export data
+                                </Button>
+                              </div>
+
+                              <div className="rounded-md border border-destructive/25 bg-destructive/6 px-4 py-4 dark:border-destructive/30 dark:bg-destructive/8">
+                                <div className="text-sm font-medium text-foreground">Delete stored data</div>
+                                <p className="mt-1 text-sm text-muted-foreground">
+                                  Remove chats, folders, and stored workspace records for this account.
+                                </p>
+                                <Button className="mt-4" variant="destructive" disabled={isDeletingData} onClick={() => deleteStoredData().catch((error: Error) => setErrorMessage(error.message))}>
+                                  {isDeletingData ? <Loader2 className="mr-2 size-4 animate-spin" /> : <Trash2 className="mr-2 size-4" />}
+                                  Delete stored data
+                                </Button>
+                              </div>
+                            </CardContent>
+                          </Card>
                         </section>
                         ) : null}
 
@@ -3335,6 +3931,14 @@ export default function App() {
   const { isLoaded, userId } = useAuth()
   const [theme, setTheme] = useState<ThemeMode>('dark')
   const [route, setRoute] = useState<RouteState>(() => parseRoute(window.location.pathname))
+  const [themeTransition, setThemeTransition] = useState<{
+    x: number
+    y: number
+    size: number
+    nextTheme: ThemeMode
+    isVisible: boolean
+  } | null>(null)
+  const themeTransitionTimersRef = useRef<number[]>([])
 
   useEffect(() => {
     const saved = (window.localStorage.getItem('poorplexity-theme') as ThemeMode | null) ?? 'dark'
@@ -3345,11 +3949,59 @@ export default function App() {
     return () => window.removeEventListener('popstate', onPopState)
   }, [])
 
-  const toggleTheme = () => {
-    const next = theme === 'dark' ? 'light' : 'dark'
+  const clearThemeTransitionTimers = () => {
+    themeTransitionTimersRef.current.forEach((timer) => window.clearTimeout(timer))
+    themeTransitionTimersRef.current = []
+  }
+
+  useEffect(() => {
+    return () => clearThemeTransitionTimers()
+  }, [])
+
+  const applyTheme = (next: ThemeMode) => {
     setTheme(next)
     document.documentElement.classList.toggle('dark', next === 'dark')
     window.localStorage.setItem('poorplexity-theme', next)
+  }
+
+  const toggleTheme = (origin?: ThemeToggleOrigin) => {
+    const next = theme === 'dark' ? 'light' : 'dark'
+    const reduceMotion = window.matchMedia('(prefers-reduced-motion: reduce)').matches
+
+    clearThemeTransitionTimers()
+
+    if (!origin || reduceMotion) {
+      setThemeTransition(null)
+      applyTheme(next)
+      return
+    }
+
+    const maxHorizontal = Math.max(origin.x, window.innerWidth - origin.x)
+    const maxVertical = Math.max(origin.y, window.innerHeight - origin.y)
+    const size = Math.ceil(Math.hypot(maxHorizontal, maxVertical) * 2)
+
+    setThemeTransition({
+      x: origin.x,
+      y: origin.y,
+      size,
+      nextTheme: next,
+      isVisible: false,
+    })
+
+    const rafId = window.requestAnimationFrame(() => {
+      setThemeTransition((current) => current ? { ...current, isVisible: true } : current)
+    })
+
+    const applyTimer = window.setTimeout(() => {
+      applyTheme(next)
+    }, 460)
+
+    const cleanupTimer = window.setTimeout(() => {
+      setThemeTransition(null)
+    }, 560)
+
+    themeTransitionTimersRef.current = [applyTimer, cleanupTimer]
+    window.setTimeout(() => window.cancelAnimationFrame(rafId), 0)
   }
 
   const navigateToProfile = (username: string) => {
@@ -3370,6 +4022,21 @@ export default function App() {
 
   return (
     <>
+      {themeTransition ? (
+        <div
+          aria-hidden="true"
+          className="theme-transition-overlay"
+          data-next-theme={themeTransition.nextTheme}
+          style={{
+            width: `${themeTransition.size}px`,
+            height: `${themeTransition.size}px`,
+            left: `${themeTransition.x - themeTransition.size / 2}px`,
+            top: `${themeTransition.y - themeTransition.size / 2}px`,
+            transform: themeTransition.isVisible ? 'scale(1)' : 'scale(0)',
+            opacity: themeTransition.isVisible ? 1 : 0.98,
+          }}
+        />
+      ) : null}
       <ClerkLoading>
         <WorkspaceSkeleton />
       </ClerkLoading>

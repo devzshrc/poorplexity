@@ -461,6 +461,35 @@ function makeChatTitle(input: string): string {
   return sentence.length <= 60 ? sentence : `${sentence.slice(0, 57).trim()}...`;
 }
 
+function tokenizeTopicWords(value: string) {
+  return value
+    .toLowerCase()
+    .replace(/[^a-z0-9\s-]/g, " ")
+    .split(/\s+/)
+    .filter((word) =>
+      word.length > 2
+      && !new Set([
+        "the",
+        "and",
+        "for",
+        "with",
+        "from",
+        "that",
+        "this",
+        "into",
+        "your",
+        "about",
+        "chat",
+        "untitled",
+        "what",
+        "when",
+        "where",
+        "which",
+        "their",
+      ]).has(word)
+    );
+}
+
 async function pruneUnusedEmptyChats(clerkUserId: string, excludeChatId?: string | null) {
   const query: Record<string, unknown> = {
     clerkUserId,
@@ -1571,6 +1600,14 @@ export async function appendMessage(params: {
       chatId: String(chat._id),
       role: params.role,
       contentLength: params.content.length,
+      ...(params.role === "assistant"
+        ? {
+            webSearchUsed: Boolean(params.webSearchUsed),
+            sourceCount: params.sources?.length ?? 0,
+            followUpCount: params.followUps?.length ?? 0,
+            confidence: params.confidence ?? null,
+          }
+        : {}),
     },
   });
 
@@ -1642,15 +1679,76 @@ export async function searchWorkspace(clerkUserId: string, query: string) {
 export async function getUsageDashboard(clerkUserId: string) {
   await ensureDatabase();
 
-  const [user, sentToday, activity, totalChats, archivedChats] = await Promise.all([
+  const [user, sentToday, activity, chats, folders] = await Promise.all([
     AppUser.findOne({ clerkUserId }).lean<any>(),
     getDailyUserMessageCount(clerkUserId),
     Activity.find({ clerkUserId }).sort({ createdAt: -1 }).limit(50).lean<any[]>(),
-    Chat.countDocuments({ clerkUserId, isDeleted: false }),
-    Chat.countDocuments({ clerkUserId, isArchived: true, isDeleted: false }),
+    Chat.find({ clerkUserId, isDeleted: false }).lean<any[]>(),
+    ChatFolder.find({ clerkUserId }).lean<any[]>(),
   ]);
 
   const dailyLimit = user ? messageLimitForUser(user) : getDailyMessageLimits().free;
+  const totalChats = chats.length;
+  const archivedChats = chats.filter((chat) => chat.isArchived).length;
+  const pinnedChats = chats.filter((chat) => chat.isPinned).length;
+  const branchChats = chats.filter((chat) => chat.branchFromChatId).length;
+  const totalMessages = chats.reduce((sum, chat) => sum + chat.messages.length, 0);
+  const userMessages = chats.reduce((sum, chat) => sum + chat.messages.filter((message: any) => message.role === "user").length, 0);
+  const assistantMessages = totalMessages - userMessages;
+  const webSearchReplies = chats.reduce(
+    (sum, chat) => sum + chat.messages.filter((message: any) => message.role === "assistant" && message.webSearchUsed).length,
+    0
+  );
+  const sourcedReplies = chats.reduce(
+    (sum, chat) => sum + chat.messages.filter((message: any) => message.role === "assistant" && Array.isArray(message.sources) && message.sources.length > 0).length,
+    0
+  );
+  const sourceDomainCounts = new Map<string, number>();
+  const folderChatCounts = new Map<string, number>();
+  const topicCounts = new Map<string, number>();
+
+  for (const chat of chats) {
+    if (chat.folderId) {
+      const key = String(chat.folderId);
+      folderChatCounts.set(key, (folderChatCounts.get(key) ?? 0) + 1);
+    }
+
+    for (const word of tokenizeTopicWords(String(chat.title ?? ""))) {
+      topicCounts.set(word, (topicCounts.get(word) ?? 0) + 1);
+    }
+
+    for (const message of chat.messages ?? []) {
+      for (const source of message.sources ?? []) {
+        try {
+          const host = new URL(String(source.url)).hostname.replace(/^www\./, "");
+          sourceDomainCounts.set(host, (sourceDomainCounts.get(host) ?? 0) + 1);
+        } catch {
+          continue;
+        }
+      }
+    }
+  }
+
+  const recentDays = Array.from({ length: 14 }, (_, offset) => {
+    const date = new Date();
+    date.setUTCHours(0, 0, 0, 0);
+    date.setUTCDate(date.getUTCDate() - (13 - offset));
+    const key = date.toISOString().slice(0, 10);
+    return { key, count: 0, prompts: 0, replies: 0, searches: 0 };
+  });
+  const recentDayIndex = new Map(recentDays.map((day, index) => [day.key, index]));
+
+  for (const item of activity) {
+    const key = new Date(item.createdAt).toISOString().slice(0, 10);
+    const index = recentDayIndex.get(key);
+    if (typeof index !== "number") continue;
+    recentDays[index].count += 1;
+    if (item.type === "message.user.created") recentDays[index].prompts += 1;
+    if (item.type === "message.assistant.created") {
+      recentDays[index].replies += 1;
+      if (item.metadata?.webSearchUsed) recentDays[index].searches += 1;
+    }
+  }
 
   return {
     sentToday,
@@ -1658,6 +1756,43 @@ export async function getUsageDashboard(clerkUserId: string) {
     dailyLimit,
     totalChats,
     archivedChats,
+    pinnedChats,
+    branchChats,
+    totalMessages,
+    userMessages,
+    assistantMessages,
+    webSearchReplies,
+    sourcedReplies,
+    folderCount: folders.length,
+    averageMessagesPerChat: totalChats ? Number((totalMessages / totalChats).toFixed(1)) : 0,
+    topChats: chats
+      .slice()
+      .sort((a, b) => b.messages.length - a.messages.length || +new Date(b.updatedAt) - +new Date(a.updatedAt))
+      .slice(0, 5)
+      .map((chat) => ({
+        id: String(chat._id),
+        title: String(chat.title ?? "Untitled chat"),
+        messageCount: chat.messages.length,
+        updatedAt: new Date(chat.updatedAt).toISOString(),
+        branchFromChatId: chat.branchFromChatId ? String(chat.branchFromChatId) : null,
+      })),
+    topFolders: folders
+      .map((folder) => ({
+        id: String(folder._id),
+        name: String(folder.name),
+        chatCount: folderChatCounts.get(String(folder._id)) ?? 0,
+      }))
+      .sort((a, b) => b.chatCount - a.chatCount || a.name.localeCompare(b.name))
+      .slice(0, 5),
+    topSourceDomains: Array.from(sourceDomainCounts.entries())
+      .sort((a, b) => b[1] - a[1] || a[0].localeCompare(b[0]))
+      .slice(0, 6)
+      .map(([domain, count]) => ({ domain, count })),
+    topTopics: Array.from(topicCounts.entries())
+      .sort((a, b) => b[1] - a[1] || a[0].localeCompare(b[0]))
+      .slice(0, 8)
+      .map(([label, count]) => ({ label, count })),
+    recentDays,
     activity: activity.map((item) => ({
       id: String(item._id),
       type: item.type,
