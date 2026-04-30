@@ -8,6 +8,7 @@ import {
   Archive,
   ArrowLeft,
   Check,
+  Copy,
   Download,
   FileCode2,
   FileText,
@@ -30,6 +31,7 @@ import {
   Send,
   Settings,
   Sparkles,
+  Square,
   Star,
   Sun,
   Trash2,
@@ -248,9 +250,9 @@ const MODEL_OPTIONS = [
   'meta-llama/llama-4-scout-17b-16e-instruct',
 ] as const
 
-const fadeUp = {}
-const subtleList = {}
-const fadeScale = {}
+const fadeUp = { className: 'anim-fade-up' }
+const subtleList = { className: '' }
+const fadeScale = { className: 'anim-scale-in' }
 
 type StaticMotionProps = {
   initial?: unknown
@@ -263,18 +265,28 @@ type StaticMotionProps = {
   layout?: unknown
 }
 
+function pickAnim(variants: unknown, fallback: string): string {
+  if (variants && typeof variants === 'object' && 'className' in variants) {
+    const value = (variants as { className?: unknown }).className
+    if (typeof value === 'string') return value
+  }
+  return fallback
+}
+
 function StaticMotionDiv({
   initial: _initial,
   animate: _animate,
   exit: _exit,
   transition: _transition,
-  variants: _variants,
+  variants,
   whileHover: _whileHover,
   whileTap: _whileTap,
   layout: _layout,
+  className,
   ...props
 }: ComponentPropsWithoutRef<'div'> & StaticMotionProps) {
-  return <div {...props} />
+  const anim = pickAnim(variants, 'anim-fade-in')
+  return <div className={joinClasses(anim, className)} {...props} />
 }
 
 function StaticMotionSection({
@@ -282,13 +294,15 @@ function StaticMotionSection({
   animate: _animate,
   exit: _exit,
   transition: _transition,
-  variants: _variants,
+  variants,
   whileHover: _whileHover,
   whileTap: _whileTap,
   layout: _layout,
+  className,
   ...props
 }: ComponentPropsWithoutRef<'section'> & StaticMotionProps) {
-  return <section {...props} />
+  const anim = pickAnim(variants, 'anim-fade-up')
+  return <section className={joinClasses(anim, className)} {...props} />
 }
 
 function StaticMotionButton({
@@ -482,30 +496,96 @@ function ThemeToggle({ theme, onToggle }: { theme: ThemeMode; onToggle: () => vo
   )
 }
 
+function faviconUrl(url: string) {
+  try {
+    const host = new URL(url).hostname
+    return `https://www.google.com/s2/favicons?sz=32&domain=${host}`
+  } catch {
+    return ''
+  }
+}
+
+function CitationsSkeleton() {
+  return (
+    <div className="mt-4 grid gap-2 sm:grid-cols-2">
+      {Array.from({ length: 4 }).map((_, idx) => (
+        <div key={idx} className="rounded-md border border-border bg-background/60 px-3 py-2">
+          <Skeleton className="h-3 w-3/4" />
+          <Skeleton className="mt-2 h-2.5 w-1/2" />
+        </div>
+      ))}
+    </div>
+  )
+}
+
 function MessageSources({ sources }: { sources: Source[] }) {
   if (!sources.length) return null
   return (
-    <motion.div
-      variants={subtleList}
-      initial={false}
-      animate="animate"
-      className="mt-4 grid gap-2 sm:grid-cols-2"
-    >
-      {sources.slice(0, 6).map((source) => (
-        <motion.a
-          variants={fadeUp}
-          key={source.url}
-          href={source.url}
-          target="_blank"
-          rel="noreferrer"
-          className="premium-surface border border-border px-3 py-2 text-xs transition-colors hover:-translate-y-px hover:bg-muted"
-        >
-          <div className="line-clamp-2 font-medium">{source.title || safeHostname(source.url)}</div>
-          <div className="mt-1 truncate text-muted-foreground">{safeHostname(source.url)}</div>
-        </motion.a>
-      ))}
-    </motion.div>
+    <div className="mt-4 grid gap-2 sm:grid-cols-2">
+      {sources.slice(0, 6).map((source, idx) => {
+        const fav = faviconUrl(source.url)
+        return (
+          <a
+            key={source.url + idx}
+            href={source.url}
+            target="_blank"
+            rel="noreferrer"
+            className="premium-surface flex gap-2 border border-border px-3 py-2 text-xs transition-colors hover:-translate-y-px hover:bg-muted"
+          >
+            <span className="mt-0.5 inline-flex size-5 shrink-0 items-center justify-center overflow-hidden rounded bg-muted text-[10px] font-semibold text-muted-foreground">
+              {fav ? <img src={fav} alt="" className="size-4" referrerPolicy="no-referrer" /> : idx + 1}
+            </span>
+            <span className="min-w-0 flex-1">
+              <span className="line-clamp-2 block font-medium">{source.title || safeHostname(source.url)}</span>
+              <span className="mt-1 block truncate text-muted-foreground">{safeHostname(source.url)}</span>
+            </span>
+          </a>
+        )
+      })}
+    </div>
   )
+}
+
+function CitationInline({ source, index }: { source: Source; index: number }) {
+  return (
+    <span className="group relative inline-block">
+      <a
+        href={source.url}
+        target="_blank"
+        rel="noreferrer"
+        className="mx-0.5 inline-flex size-4 items-center justify-center rounded-full bg-muted align-text-top text-[10px] font-semibold leading-none text-foreground/80 no-underline transition-colors hover:bg-foreground hover:text-background"
+      >
+        {index}
+      </a>
+      <span className="pointer-events-none absolute bottom-full left-1/2 z-30 mb-1 hidden w-64 -translate-x-1/2 rounded-md border border-border bg-popover p-3 text-left text-xs shadow-lg group-hover:block">
+        <span className="flex items-center gap-2">
+          {faviconUrl(source.url) ? (
+            <img src={faviconUrl(source.url)} alt="" className="size-3.5" referrerPolicy="no-referrer" />
+          ) : null}
+          <span className="truncate text-muted-foreground">{safeHostname(source.url)}</span>
+        </span>
+        <span className="mt-1 block font-medium leading-snug">{source.title || safeHostname(source.url)}</span>
+        {source.content ? (
+          <span className="mt-1 block line-clamp-3 text-muted-foreground">{source.content}</span>
+        ) : null}
+      </span>
+    </span>
+  )
+}
+
+function preprocessCitations(text: string, sourceCount: number) {
+  if (!sourceCount || !text) return text
+  const parts = text.split(/(```[\s\S]*?```|`[^`]*`)/g)
+  return parts
+    .map((part, i) => {
+      if (i % 2 === 1) return part
+      return part.replace(/\[(\d+)\]/g, (match, n) => {
+        const idx = Number(n)
+        if (idx >= 1 && idx <= sourceCount) return `[${idx}](cite-${idx})`
+        return match
+      })
+    })
+    .join('')
 }
 
 function WorkspaceSkeleton() {
@@ -1009,6 +1089,25 @@ function Workspace({
   const [showSidebar, setShowSidebar] = useState(false)
   const abortRef = useRef<AbortController | null>(null)
   const messagesEndRef = useRef<HTMLDivElement | null>(null)
+  const composerRef = useRef<HTMLTextAreaElement | null>(null)
+  const [copiedKey, setCopiedKey] = useState<string | null>(null)
+
+  const copyToClipboard = async (text: string, key: string) => {
+    try {
+      await navigator.clipboard.writeText(text)
+      setCopiedKey(key)
+      window.setTimeout(() => setCopiedKey((current) => (current === key ? null : current)), 1500)
+    } catch (error) {
+      setErrorMessage(error instanceof Error ? error.message : 'Unable to copy')
+    }
+  }
+
+  const stopStreaming = () => {
+    abortRef.current?.abort()
+    abortRef.current = null
+    setIsSending(false)
+  }
+
 
   const authorizedFetch = async (path: string, init?: RequestInit) => {
     const token = await getToken()
@@ -1095,6 +1194,57 @@ function Workspace({
   useEffect(() => {
     messagesEndRef.current?.scrollIntoView({ block: 'end' })
   }, [selectedChatId, selectedChat?.messages.length])
+
+  useEffect(() => {
+    const isMobileOverlay = (showSidebar || mainView === 'settings')
+      && typeof window !== 'undefined' && window.matchMedia('(max-width: 1023px)').matches
+    if (isMobileOverlay) {
+      document.body.classList.add('lock-scroll')
+      return () => document.body.classList.remove('lock-scroll')
+    }
+    document.body.classList.remove('lock-scroll')
+  }, [showSidebar, mainView])
+
+  useEffect(() => {
+    const handler = (event: KeyboardEvent) => {
+      const target = event.target as HTMLElement | null
+      const isInField = target?.tagName === 'INPUT' || target?.tagName === 'TEXTAREA' || target?.isContentEditable
+      const meta = event.metaKey || event.ctrlKey
+
+      if (meta && event.key.toLowerCase() === 'k') {
+        event.preventDefault()
+        createNewChat().catch((error: Error) => setErrorMessage(error.message))
+        return
+      }
+      if (meta && event.key === '/') {
+        event.preventDefault()
+        composerRef.current?.focus()
+        return
+      }
+      if (event.key === 'Escape') {
+        if (isSending) {
+          event.preventDefault()
+          stopStreaming()
+        }
+        return
+      }
+      if (event.key === 'ArrowUp' && !meta && !event.shiftKey && !event.altKey) {
+        if (target === composerRef.current && composer.length === 0 && selectedChat) {
+          const lastUser = [...selectedChat.messages].reverse().find((m) => m.role === 'user')
+          if (lastUser) {
+            event.preventDefault()
+            setEditingMessageId(lastUser.id)
+            setComposer(lastUser.content)
+          }
+        }
+        return
+      }
+
+      if (isInField) return
+    }
+    window.addEventListener('keydown', handler)
+    return () => window.removeEventListener('keydown', handler)
+  }, [isSending, composer, selectedChat])
 
   useEffect(() => {
     if (!searchQuery.trim()) {
@@ -1605,12 +1755,118 @@ function Workspace({
       URL.revokeObjectURL(url)
       return
     }
-    const win = window.open('', '_blank', 'noopener,noreferrer,width=900,height=700')
-    if (!win) return
-    win.document.write(`<pre style="white-space:pre-wrap;font-family:Inter,sans-serif;padding:24px;">${markdown.replace(/</g, '&lt;').replace(/>/g, '&gt;')}</pre>`)
-    win.document.close()
-    win.focus()
-    win.print()
+    const escapeHtml = (value: string) => value
+      .replace(/&/g, '&amp;')
+      .replace(/</g, '&lt;')
+      .replace(/>/g, '&gt;')
+
+    const renderInline = (value: string) => escapeHtml(value)
+      .replace(/\*\*([^*]+)\*\*/g, '<strong>$1</strong>')
+      .replace(/(^|[^*])\*([^*\n]+)\*/g, '$1<em>$2</em>')
+      .replace(/`([^`]+)`/g, '<code>$1</code>')
+      .replace(/\[([^\]]+)\]\(([^)]+)\)/g, '<a href="$2">$1</a>')
+
+    const renderMarkdown = (text: string) => {
+      const lines = text.split('\n')
+      const out: string[] = []
+      let inCode = false
+      let inList = false
+      const closeList = () => { if (inList) { out.push('</ul>'); inList = false } }
+      for (const raw of lines) {
+        if (raw.startsWith('```')) {
+          closeList()
+          if (inCode) { out.push('</code></pre>'); inCode = false }
+          else { out.push('<pre><code>'); inCode = true }
+          continue
+        }
+        if (inCode) { out.push(escapeHtml(raw)); continue }
+        if (/^#{1,6}\s/.test(raw)) {
+          closeList()
+          const level = raw.match(/^#+/)![0].length
+          out.push(`<h${level}>${renderInline(raw.replace(/^#+\s+/, ''))}</h${level}>`)
+          continue
+        }
+        if (/^\s*[-*]\s+/.test(raw)) {
+          if (!inList) { out.push('<ul>'); inList = true }
+          out.push(`<li>${renderInline(raw.replace(/^\s*[-*]\s+/, ''))}</li>`)
+          continue
+        }
+        if (/^>\s?/.test(raw)) {
+          closeList()
+          out.push(`<blockquote>${renderInline(raw.replace(/^>\s?/, ''))}</blockquote>`)
+          continue
+        }
+        if (raw.trim() === '') { closeList(); out.push(''); continue }
+        closeList()
+        out.push(`<p>${renderInline(raw)}</p>`)
+      }
+      closeList()
+      if (inCode) out.push('</code></pre>')
+      return out.join('\n')
+    }
+
+    const safeTitle = escapeHtml(selectedChat.title || 'Chat')
+    const html = `<!doctype html>
+<html><head><meta charset="utf-8"><title>${safeTitle}</title>
+<style>
+  @page { margin: 16mm; }
+  body { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Inter, sans-serif; color: #111; line-height: 1.55; max-width: 760px; margin: 0 auto; padding: 8px; }
+  h1 { font-size: 22px; margin: 0 0 4px; }
+  h2 { font-size: 14px; margin: 24px 0 6px; color: #444; border-bottom: 1px solid #ddd; padding-bottom: 4px; }
+  h3 { font-size: 13px; margin: 18px 0 6px; }
+  p { margin: 8px 0; font-size: 12.5px; }
+  ul { margin: 6px 0 6px 22px; padding: 0; }
+  li { font-size: 12.5px; margin: 3px 0; }
+  blockquote { border-left: 3px solid #ccc; margin: 10px 0; padding: 4px 12px; color: #555; font-style: italic; }
+  code { background: #f3f3f3; padding: 1px 4px; border-radius: 3px; font-size: 11.5px; }
+  pre { background: #f6f6f6; padding: 10px 12px; border-radius: 4px; overflow: auto; font-size: 11.5px; }
+  pre code { background: transparent; padding: 0; }
+  a { color: #0a58ca; text-decoration: none; }
+  .meta { color: #666; font-size: 11px; margin-bottom: 16px; }
+</style></head><body>
+<div class="meta">Exported ${escapeHtml(new Date().toLocaleString())} · poorplexity</div>
+${renderMarkdown(markdown)}
+</body></html>`
+
+    const iframe = document.createElement('iframe')
+    iframe.style.position = 'fixed'
+    iframe.style.right = '0'
+    iframe.style.bottom = '0'
+    iframe.style.width = '0'
+    iframe.style.height = '0'
+    iframe.style.border = '0'
+    iframe.setAttribute('aria-hidden', 'true')
+    document.body.appendChild(iframe)
+
+    const cleanup = () => {
+      window.setTimeout(() => {
+        if (iframe.parentNode) iframe.parentNode.removeChild(iframe)
+      }, 1000)
+    }
+
+    const triggerPrint = () => {
+      const win = iframe.contentWindow
+      if (!win) { cleanup(); return }
+      try {
+        win.focus()
+        win.print()
+      } catch {
+        // ignore
+      }
+      win.addEventListener('afterprint', cleanup, { once: true })
+      window.setTimeout(cleanup, 60000)
+    }
+
+    iframe.onload = () => window.setTimeout(triggerPrint, 50)
+    const doc = iframe.contentDocument
+    if (doc) {
+      doc.open()
+      doc.write(html)
+      doc.close()
+      if (doc.readyState === 'complete') window.setTimeout(triggerPrint, 50)
+    } else {
+      cleanup()
+    }
   }
 
   if (isBooting) return <WorkspaceSkeleton />
@@ -1670,7 +1926,7 @@ function Workspace({
           {openFolderMenuId === folder.id ? (
             <motion.div
               {...fadeUp}
-              className="absolute right-0 top-full z-20 mt-2 w-64 rounded-md border border-border bg-popover/95 p-1 shadow-lg backdrop-blur-sm"
+              className="mt-2 rounded-md border border-border bg-popover/95 p-1 shadow-md"
             >
               {[
                 {
@@ -1731,20 +1987,34 @@ function Workspace({
   }
 
   return (
-    <div className="min-h-dvh overflow-x-hidden bg-background p-3 sm:p-6 lg:h-dvh lg:overflow-hidden">
-      <div className="mb-3 flex items-center justify-between gap-3 lg:hidden">
-        <div className="min-w-0">
-          <div className="truncate text-base font-semibold tracking-tight">poorplexity</div>
-          <div className="text-[11px] text-muted-foreground">
+    <div className="min-h-dvh overflow-x-hidden bg-background p-3 safe-x sm:p-6 lg:h-dvh lg:overflow-hidden">
+      <div className="safe-top mb-3 flex items-center gap-2 lg:hidden">
+        <Button
+          variant="outline"
+          size="icon-sm"
+          className="h-10 w-10 shrink-0"
+          title="Open navigation"
+          onClick={() => setShowSidebar(true)}
+        >
+          <PanelLeft className="size-5" />
+        </Button>
+        <div className="min-w-0 flex-1">
+          <div className="truncate text-sm font-semibold tracking-tight">poorplexity</div>
+          <div className="truncate text-[11px] text-muted-foreground">
             {selectedChat ? selectedChat.title : 'Research workspace'}
           </div>
         </div>
-        <div className="flex items-center gap-2">
-          <ThemeToggle theme={theme} onToggle={onToggleTheme} />
-          <Button variant="outline" size="icon-sm" title="Open navigation" onClick={() => setShowSidebar(true)}>
-            <PanelLeft className="size-4" />
-          </Button>
-        </div>
+        <Button
+          variant="outline"
+          size="icon-sm"
+          className="h-10 w-10 shrink-0"
+          title="New chat"
+          disabled={isCreatingChat}
+          onClick={() => createNewChat().catch((error: Error) => setErrorMessage(error.message))}
+        >
+          {isCreatingChat ? <Loader2 className="size-4 animate-spin" /> : <Plus className="size-5" />}
+        </Button>
+        <ThemeToggle theme={theme} onToggle={onToggleTheme} />
       </div>
 
       <AnimatePresence>
@@ -1752,7 +2022,7 @@ function Workspace({
           <motion.button
             type="button"
             aria-label="Close navigation"
-            className="absolute inset-0 z-30 bg-background/60 lg:hidden"
+            className="fixed inset-0 z-30 bg-background/70 backdrop-blur-sm lg:hidden anim-fade-in"
             initial={{ opacity: 0 }}
             animate={{ opacity: 1 }}
             exit={{ opacity: 0 }}
@@ -1764,20 +2034,29 @@ function Workspace({
       <div className="grid gap-3 sm:gap-4 lg:h-full lg:min-h-0 lg:grid-cols-[320px_minmax(0,1fr)]">
         <aside
           className={joinClasses(
-            'fixed inset-y-4 left-4 z-40 flex w-[min(88vw,340px)] min-h-0 flex-col rounded-md border border-border bg-card/92 shadow-lg backdrop-blur-sm transition-transform duration-200 lg:static lg:w-auto lg:translate-x-0 lg:bg-card/75 lg:shadow-sm',
-            showSidebar ? 'translate-x-0' : '-translate-x-[120%]',
+            'fixed inset-y-2 left-2 z-40 flex w-[min(86vw,340px)] min-h-0 flex-col overflow-hidden rounded-lg border border-border bg-card/95 shadow-2xl backdrop-blur-md transition-transform duration-250 ease-[cubic-bezier(0.22,1,0.36,1)] safe-top lg:static lg:inset-auto lg:w-auto lg:rounded-md lg:translate-x-0 lg:bg-card/75 lg:shadow-sm lg:backdrop-blur-none',
+            showSidebar ? 'translate-x-0' : '-translate-x-[110%] lg:translate-x-0',
           )}
         >
-          <div className="flex items-center justify-between px-4 py-4">
-            <div>
-              <h1 className="text-lg font-semibold tracking-tight">poorplexity</h1>
-              <p className="text-xs text-muted-foreground">Research workspace</p>
+          <div className="flex items-center justify-between gap-2 px-4 py-4">
+            <div className="min-w-0">
+              <h1 className="truncate text-lg font-semibold tracking-tight">poorplexity</h1>
+              <p className="truncate text-xs text-muted-foreground">Research workspace</p>
             </div>
-            <div className="flex items-center gap-2">
-              <ThemeToggle theme={theme} onToggle={onToggleTheme} />
+            <div className="flex items-center gap-1.5">
+              <div className="hidden lg:block"><ThemeToggle theme={theme} onToggle={onToggleTheme} /></div>
               <div className="flex size-8 items-center justify-center rounded-full bg-muted text-xs font-semibold">{userInitial}</div>
-              <Button variant="ghost" size="icon-sm" title="Sign out" onClick={() => clerk.signOut({ redirectUrl: window.location.origin })}>
+              <Button variant="ghost" size="icon-sm" className="hidden lg:inline-flex" title="Sign out" onClick={() => clerk.signOut({ redirectUrl: window.location.origin })}>
                 <LogOut className="size-4" />
+              </Button>
+              <Button
+                variant="ghost"
+                size="icon-sm"
+                className="h-9 w-9 lg:hidden"
+                title="Close navigation"
+                onClick={() => setShowSidebar(false)}
+              >
+                <X className="size-4" />
               </Button>
             </div>
           </div>
@@ -1857,7 +2136,7 @@ function Workspace({
 
           <Separator />
 
-          <div className="flex-1 overflow-visible p-3 lg:min-h-0 lg:overflow-y-auto">
+          <div className="flex-1 min-h-0 overflow-y-auto p-3 safe-bottom">
             {searchQuery.trim() ? (
               <div className="space-y-4">
                 <div className="space-y-2">
@@ -1984,7 +2263,7 @@ function Workspace({
                       {showToolsMenu ? (
                   <motion.div
                     {...fadeScale}
-                    className="absolute right-0 top-full z-20 mt-2 w-72 rounded-md border border-border bg-popover/95 p-1 shadow-lg backdrop-blur-sm"
+                    className="absolute right-0 top-full z-20 mt-2 w-[min(calc(100vw-2rem),18rem)] max-h-[60vh] overflow-y-auto rounded-md border border-border bg-popover/95 p-1 shadow-lg backdrop-blur-sm"
                   >
                     {[
                       {
@@ -2126,7 +2405,23 @@ function Workspace({
                         </div>
                         {message.role === 'assistant' ? (
                           <div className="prose-answer">
-                            <ReactMarkdown remarkPlugins={[remarkGfm]}>{message.content || (isSending && selectedChat.messages.at(-1)?.id === message.id ? 'Thinking...' : '')}</ReactMarkdown>
+                            <ReactMarkdown
+                              remarkPlugins={[remarkGfm]}
+                              components={{
+                                a: ({ href, children, ...rest }) => {
+                                  if (href?.startsWith('cite-')) {
+                                    const idx = Number(href.slice(5))
+                                    const source = message.sources?.[idx - 1]
+                                    if (source) return <CitationInline source={source} index={idx} />
+                                  }
+                                  return <a href={href} target="_blank" rel="noreferrer" {...rest}>{children}</a>
+                                },
+                              }}
+                            >
+                              {message.content
+                                ? preprocessCitations(message.content, message.sources?.length ?? 0)
+                                : (isSending && selectedChat.messages.at(-1)?.id === message.id ? 'Thinking...' : '')}
+                            </ReactMarkdown>
                           </div>
                         ) : (
                           <p className="whitespace-pre-wrap text-sm leading-7">{message.content}</p>
@@ -2142,11 +2437,18 @@ function Workspace({
                             </ul>
                           </div>
                         ) : null}
-                        {message.sources?.length ? <MessageSources sources={message.sources} /> : null}
+                        {message.sources?.length
+                          ? <MessageSources sources={message.sources} />
+                          : (message.role === 'assistant'
+                              && isSending
+                              && selectedChat.messages.at(-1)?.id === message.id
+                              && (selectedChat.settings.useWebSearch ?? composerUseWebSearch)
+                              ? <CitationsSkeleton />
+                              : null)}
                         <div className="mt-4 flex max-w-full flex-wrap gap-2 overflow-hidden">
                           {message.role === 'user' ? (
                             <>
-                              <Button variant="outline" size="sm" title="Edit and resend this message" onClick={() => { setEditingMessageId(message.id); setComposer(message.content) }}>
+                              <Button variant="outline" size="sm" title="Edit and resend this message" onClick={() => { setEditingMessageId(message.id); setComposer(message.content); composerRef.current?.focus() }}>
                                 <Pencil className="mr-2 size-3.5" />
                                 Edit
                               </Button>
@@ -2154,9 +2456,30 @@ function Workspace({
                                 <GitBranch className="mr-2 size-3.5" />
                                 Branch
                               </Button>
+                              <Button variant="outline" size="sm" title="Copy message" onClick={() => copyToClipboard(message.content, `msg-${message.id}`)}>
+                                {copiedKey === `msg-${message.id}` ? <Check className="mr-2 size-3.5" /> : <Copy className="mr-2 size-3.5" />}
+                                {copiedKey === `msg-${message.id}` ? 'Copied' : 'Copy'}
+                              </Button>
                             </>
                           ) : null}
-                          {message.role === 'assistant' && index === selectedChat.messages.length - 1 ? (
+                          {message.role === 'assistant' ? (
+                            <Button
+                              variant="outline"
+                              size="sm"
+                              title="Copy answer"
+                              disabled={!message.content}
+                              onClick={() => {
+                                const sourcesBlock = message.sources?.length
+                                  ? '\n\nSources:\n' + message.sources.map((s, i) => `[${i + 1}] ${s.title || safeHostname(s.url)} — ${s.url}`).join('\n')
+                                  : ''
+                                copyToClipboard(message.content + sourcesBlock, `msg-${message.id}`)
+                              }}
+                            >
+                              {copiedKey === `msg-${message.id}` ? <Check className="mr-2 size-3.5" /> : <Copy className="mr-2 size-3.5" />}
+                              {copiedKey === `msg-${message.id}` ? 'Copied' : 'Copy'}
+                            </Button>
+                          ) : null}
+                          {message.role === 'assistant' && index === selectedChat.messages.length - 1 && !isSending ? (
                             <Button variant="outline" size="sm" title="Regenerate the last answer" onClick={() => regenerateLastAnswer().catch((error: Error) => setErrorMessage(error.message))}>
                               <RotateCcw className="mr-2 size-3.5" />
                               Regenerate
@@ -2219,6 +2542,7 @@ function Workspace({
                     ) : null}
                   </AnimatePresence>
                   <Textarea
+                    ref={composerRef}
                     value={composer}
                     onChange={(event) => setComposer(event.target.value)}
                     onKeyDown={(event) => {
@@ -2228,7 +2552,7 @@ function Workspace({
                         else sendMessage().catch((error: Error) => setErrorMessage(error.message))
                       }
                     }}
-                    placeholder={editingMessageId ? 'Update that earlier message and resend.' : 'Ask a follow-up. Shift+Enter for a new line.'}
+                    placeholder={editingMessageId ? 'Update that earlier message and resend.' : 'Ask a follow-up. ⌘K new chat · ⌘/ focus · ↑ edit last · Esc stop. Shift+Enter for a new line.'}
                     className="min-h-16 max-h-36 sm:min-h-28"
                   />
                   <div className="mt-3 flex flex-col gap-2 sm:flex-row sm:flex-wrap sm:items-center sm:justify-between">
@@ -2246,20 +2570,32 @@ function Workspace({
                     </div>
                     <div className="flex w-full items-center gap-2 sm:w-auto">
                       {editingMessageId ? <Button className="h-11" variant="ghost" onClick={() => { setEditingMessageId(null); setComposer('') }}>Cancel</Button> : null}
-                      <Button
-                        className="h-11 flex-1 sm:flex-none"
-                        disabled={isSending || !composer.trim()}
-                        onClick={() => (
-                          workspace?.usage.remainingToday === 0 && !workspace?.user.billing.isPremium
-                            ? startPremiumCheckout().catch((error: Error) => setErrorMessage(error.message))
-                            : (editingMessageId ? editAndResendMessage() : sendMessage()).catch((error: Error) => setErrorMessage(error.message))
-                        )}
-                      >
-                        {isSending ? <Loader2 className="mr-2 size-4 animate-spin" /> : <Send className="mr-2 size-4" />}
-                        {workspace?.usage.remainingToday === 0 && !workspace?.user.billing.isPremium
-                          ? 'Upgrade to send more'
-                          : editingMessageId ? 'Update and resend' : 'Send'}
-                      </Button>
+                      {isSending ? (
+                        <Button
+                          className="h-11 flex-1 sm:flex-none"
+                          variant="outline"
+                          title="Stop generating (Esc)"
+                          onClick={stopStreaming}
+                        >
+                          <Square className="mr-2 size-4 fill-current" />
+                          Stop
+                        </Button>
+                      ) : (
+                        <Button
+                          className="h-11 flex-1 sm:flex-none"
+                          disabled={!composer.trim()}
+                          onClick={() => (
+                            workspace?.usage.remainingToday === 0 && !workspace?.user.billing.isPremium
+                              ? startPremiumCheckout().catch((error: Error) => setErrorMessage(error.message))
+                              : (editingMessageId ? editAndResendMessage() : sendMessage()).catch((error: Error) => setErrorMessage(error.message))
+                          )}
+                        >
+                          <Send className="mr-2 size-4" />
+                          {workspace?.usage.remainingToday === 0 && !workspace?.user.billing.isPremium
+                            ? 'Upgrade to send more'
+                            : editingMessageId ? 'Update and resend' : 'Send'}
+                        </Button>
+                      )}
                     </div>
                   </div>
                 </div>
@@ -2287,14 +2623,14 @@ function Workspace({
                 <motion.button
                   type="button"
                   aria-label="Close settings"
-                  className="absolute inset-0 z-30 bg-background/70"
+                  className="fixed inset-0 z-30 bg-background/75 backdrop-blur-sm anim-fade-in"
                   onClick={() => setMainView('chat')}
                 />
                 <motion.div
                   {...fadeScale}
-                  className="absolute inset-0 z-40 flex items-start justify-center p-3 sm:p-6"
+                  className="fixed inset-0 z-40 flex items-stretch justify-center sm:items-start sm:p-6"
                 >
-                  <Card className="flex max-h-[calc(100dvh-1.5rem)] w-full max-w-3xl flex-col rounded-md border-border bg-card shadow-2xl sm:max-h-[calc(100dvh-3rem)]">
+                  <Card className="flex h-dvh w-full max-w-none flex-col rounded-none border-0 bg-card shadow-2xl safe-top safe-bottom sm:h-auto sm:max-h-[calc(100dvh-3rem)] sm:max-w-3xl sm:rounded-md sm:border sm:border-border">
                     <CardHeader className="border-b border-border">
                       <div className="flex items-start justify-between gap-4">
                         <div>
