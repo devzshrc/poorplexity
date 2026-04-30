@@ -237,8 +237,8 @@ Bun.serve({
     }
 
     try {
-      if (pathname === "/health" && req.method === "GET") {
-        return new Response("OK", {
+      if ((pathname === "/health" || pathname === "/api/health") && (req.method === "GET" || req.method === "HEAD")) {
+        return new Response(req.method === "HEAD" ? null : "OK", {
           status: 200,
           headers: mergeHeaders(new Headers(headers), { "Content-Type": "text/plain; charset=utf-8" }),
         });
