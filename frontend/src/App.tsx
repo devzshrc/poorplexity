@@ -65,7 +65,6 @@ import { Textarea } from '@/components/ui/textarea'
 import { API_BASE_URL } from '@/lib/config'
 
 type ThemeMode = 'light' | 'dark'
-type ThemeToggleOrigin = { x: number; y: number }
 type RouteState = { kind: 'workspace' } | { kind: 'profile'; username: string }
 
 type PreferenceRecord = {
@@ -667,25 +666,13 @@ async function consumeStream(res: Response, handlers: SSEHandlers, signal: Abort
   if (!signal.aborted) handlers.onDone()
 }
 
-function ThemeToggle({
-  theme,
-  onToggle,
-}: {
-  theme: ThemeMode
-  onToggle: (origin: ThemeToggleOrigin) => void
-}) {
+function ThemeToggle({ theme, onToggle }: { theme: ThemeMode; onToggle: () => void }) {
   return (
     <Button
       variant="outline"
       size="icon-sm"
       className="h-9 w-9"
-      onClick={(event) => {
-        const rect = event.currentTarget.getBoundingClientRect()
-        onToggle({
-          x: rect.left + rect.width / 2,
-          y: rect.top + rect.height / 2,
-        })
-      }}
+      onClick={onToggle}
       title={theme === 'dark' ? 'Switch to light mode' : 'Switch to dark mode'}
       aria-label={theme === 'dark' ? 'Switch to light mode' : 'Switch to dark mode'}
     >
@@ -927,7 +914,7 @@ function PublicProfilePage({
   username: string
   theme: ThemeMode
   onBack: () => void
-  onToggleTheme: (origin?: ThemeToggleOrigin) => void
+  onToggleTheme: () => void
 }) {
   const [profile, setProfile] = useState<PublicProfilePayload | null>(null)
   const [error, setError] = useState('')
@@ -1054,7 +1041,7 @@ function PublicWorkspace({
   onToggleTheme,
 }: {
   theme: ThemeMode
-  onToggleTheme: (origin?: ThemeToggleOrigin) => void
+  onToggleTheme: () => void
 }) {
   const [composer, setComposer] = useState('')
   const [showAuth, setShowAuth] = useState(false)
@@ -1238,7 +1225,7 @@ function Workspace({
   navigateToProfile,
 }: {
   theme: ThemeMode
-  onToggleTheme: (origin?: ThemeToggleOrigin) => void
+  onToggleTheme: () => void
   navigateToProfile: (username: string) => void
 }) {
   const { getToken } = useAuth()
@@ -3931,14 +3918,6 @@ export default function App() {
   const { isLoaded, userId } = useAuth()
   const [theme, setTheme] = useState<ThemeMode>('dark')
   const [route, setRoute] = useState<RouteState>(() => parseRoute(window.location.pathname))
-  const [themeTransition, setThemeTransition] = useState<{
-    x: number
-    y: number
-    size: number
-    nextTheme: ThemeMode
-    isVisible: boolean
-  } | null>(null)
-  const themeTransitionTimersRef = useRef<number[]>([])
 
   useEffect(() => {
     const saved = (window.localStorage.getItem('poorplexity-theme') as ThemeMode | null) ?? 'dark'
@@ -3949,59 +3928,11 @@ export default function App() {
     return () => window.removeEventListener('popstate', onPopState)
   }, [])
 
-  const clearThemeTransitionTimers = () => {
-    themeTransitionTimersRef.current.forEach((timer) => window.clearTimeout(timer))
-    themeTransitionTimersRef.current = []
-  }
-
-  useEffect(() => {
-    return () => clearThemeTransitionTimers()
-  }, [])
-
-  const applyTheme = (next: ThemeMode) => {
+  const toggleTheme = () => {
+    const next = theme === 'dark' ? 'light' : 'dark'
     setTheme(next)
     document.documentElement.classList.toggle('dark', next === 'dark')
     window.localStorage.setItem('poorplexity-theme', next)
-  }
-
-  const toggleTheme = (origin?: ThemeToggleOrigin) => {
-    const next = theme === 'dark' ? 'light' : 'dark'
-    const reduceMotion = window.matchMedia('(prefers-reduced-motion: reduce)').matches
-
-    clearThemeTransitionTimers()
-
-    if (!origin || reduceMotion) {
-      setThemeTransition(null)
-      applyTheme(next)
-      return
-    }
-
-    const maxHorizontal = Math.max(origin.x, window.innerWidth - origin.x)
-    const maxVertical = Math.max(origin.y, window.innerHeight - origin.y)
-    const size = Math.ceil(Math.hypot(maxHorizontal, maxVertical) * 2)
-
-    setThemeTransition({
-      x: origin.x,
-      y: origin.y,
-      size,
-      nextTheme: next,
-      isVisible: false,
-    })
-
-    const rafId = window.requestAnimationFrame(() => {
-      setThemeTransition((current) => current ? { ...current, isVisible: true } : current)
-    })
-
-    const applyTimer = window.setTimeout(() => {
-      applyTheme(next)
-    }, 460)
-
-    const cleanupTimer = window.setTimeout(() => {
-      setThemeTransition(null)
-    }, 560)
-
-    themeTransitionTimersRef.current = [applyTimer, cleanupTimer]
-    window.setTimeout(() => window.cancelAnimationFrame(rafId), 0)
   }
 
   const navigateToProfile = (username: string) => {
@@ -4022,21 +3953,6 @@ export default function App() {
 
   return (
     <>
-      {themeTransition ? (
-        <div
-          aria-hidden="true"
-          className="theme-transition-overlay"
-          data-next-theme={themeTransition.nextTheme}
-          style={{
-            width: `${themeTransition.size}px`,
-            height: `${themeTransition.size}px`,
-            left: `${themeTransition.x - themeTransition.size / 2}px`,
-            top: `${themeTransition.y - themeTransition.size / 2}px`,
-            transform: themeTransition.isVisible ? 'scale(1)' : 'scale(0)',
-            opacity: themeTransition.isVisible ? 1 : 0.98,
-          }}
-        />
-      ) : null}
       <ClerkLoading>
         <WorkspaceSkeleton />
       </ClerkLoading>
