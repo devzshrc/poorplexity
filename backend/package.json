@@ -6,7 +6,9 @@
   "scripts": {
     "dev": "bun --watch ./index.ts",
     "build": "bun build ./server.ts --target bun --outfile ./dist/server.js",
-    "start": "bun ./dist/server.js"
+    "start": "bun ./dist/server.js",
+    "test": "bun test",
+    "typecheck": "bunx tsc --noEmit"
   },
   "devDependencies": {
     "@types/bun": "latest"
@@ -19,7 +21,8 @@
     "@google/genai": "^1.50.1",
     "@tavily/core": "^0.7.2",
     "groq-sdk": "^1.1.2",
-    "mongoose": "^8.19.2"
+    "mongoose": "^8.19.2",
+    "zod": "^4.1.12"
   },
   "trustedDependencies": [
     "@clerk/shared"

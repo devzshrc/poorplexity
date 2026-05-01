@@ -1,20 +1,33 @@
-import mongoose, { Schema, Types } from "mongoose";
+import { Types } from "mongoose";
 import type { User } from "@clerk/backend";
 import { SUPPORTED_MODELS } from "../prompt";
+import { ensureDatabase } from "./db/connection";
 import { getDailyMessageLimits } from "./razorpay";
 import type { RazorpaySubscription } from "./razorpay";
 import { generateChatTitle, type ConversationTurn } from "./llm";
-
-function requireEnv(name: string): string {
-  const value = process.env[name]?.trim();
-  if (!value) {
-    throw new Error(`Missing required environment variable: ${name}`);
-  }
-  return value;
-}
-
-const uri = requireEnv("MONGODB_URI");
-const dbName = process.env.MONGODB_DB_NAME?.trim() || "poorplexity";
+import {
+  Activity,
+  AppUser,
+  BillingWebhookEvent,
+  Chat,
+  ChatFolder,
+  type ActivityDocument,
+  type AppUserDocument,
+  type BillingRecord,
+  type ChatDocument,
+  type FolderDocument,
+  type MessageDocument,
+  type SourceRecord,
+  type SubscriptionStatus,
+  type UserPreferenceRecord,
+  type UserProfileRecord,
+} from "./models";
+export type {
+  BillingRecord,
+  SubscriptionStatus,
+  UserPreferenceRecord,
+  UserProfileRecord,
+} from "./models";
 
 const DEFAULT_FOLDER_NAMES = [
   "Brain dump",
@@ -34,345 +47,6 @@ const MAX_MEMORY_NOTES_LENGTH = 4000;
 const MAX_SYSTEM_PROMPT_LENGTH = 4000;
 const MAX_CHAT_TITLE_LENGTH = 120;
 const SUPPORTED_MODEL_SET = new Set<string>(SUPPORTED_MODELS);
-
-const globalForMongoose = globalThis as typeof globalThis & {
-  __poorplexityMongoosePromise?: Promise<typeof mongoose>;
-};
-
-async function getMongoose() {
-  if (!globalForMongoose.__poorplexityMongoosePromise) {
-    globalForMongoose.__poorplexityMongoosePromise = mongoose.connect(uri, {
-      dbName,
-      autoIndex: true,
-    });
-  }
-
-  return globalForMongoose.__poorplexityMongoosePromise;
-}
-
-export type UserPreferenceRecord = {
-  roastLevel: "light" | "medium" | "high";
-  responseLength: "short" | "medium" | "long";
-  outputFormat: "bullets" | "paragraphs";
-  answerMode: "fast" | "balanced" | "deep";
-  preferredModel: string;
-  onlyFromSources: boolean;
-  defaultFolderId: string | null;
-  memoryNotes: string;
-  hideChatSettingsPanel: boolean;
-};
-
-export type UserProfileRecord = {
-  id: string;
-  clerkUserId: string;
-  displayName: string;
-  email: string | null;
-  imageUrl: string | null;
-  bio: string | null;
-  firstName: string | null;
-  lastName: string | null;
-  username: string | null;
-  publicUsername?: string | null;
-  billing: BillingRecord;
-  preferences: UserPreferenceRecord;
-};
-
-export type SubscriptionStatus =
-  | "inactive"
-  | "created"
-  | "authenticated"
-  | "active"
-  | "pending"
-  | "halted"
-  | "cancelled"
-  | "completed"
-  | "expired";
-
-export type BillingRecord = {
-  tier: "free" | "premium";
-  status: SubscriptionStatus;
-  isPremium: boolean;
-  planName: string | null;
-  dailyMessageLimit: number | null;
-  currentStart: string | null;
-  currentEnd: string | null;
-  renewsAt: string | null;
-  cancelAtCycleEnd: boolean;
-  amountPaise: number | null;
-  currency: string | null;
-  razorpaySubscriptionId: string | null;
-  shortUrl: string | null;
-  lastPaymentId: string | null;
-  lastWebhookEventId: string | null;
-  failureReason: string | null;
-};
-
-type SourceRecord = {
-  url: string;
-  title: string;
-  content: string;
-};
-
-type MessageDocument = {
-  _id: Types.ObjectId;
-  role: "user" | "assistant";
-  content: string;
-  createdAt: Date;
-  editedAt?: Date | null;
-  sources?: SourceRecord[];
-  followUps?: string[];
-  contextUsed?: string[];
-  confidence?: number;
-  webSearchUsed?: boolean;
-};
-
-type FolderDocument = {
-  _id: Types.ObjectId;
-  clerkUserId: string;
-  name: string;
-  parentFolderId: Types.ObjectId | null;
-  isFavorite: boolean;
-  createdAt: Date;
-  updatedAt: Date;
-};
-
-type AppUserDocument = {
-  _id: Types.ObjectId;
-  clerkUserId: string;
-  email: string | null;
-  displayName: string;
-  customDisplayName?: string | null;
-  firstName: string | null;
-  lastName: string | null;
-  username: string | null;
-  publicUsername?: string | null;
-  imageUrl: string | null;
-  customImageUrl?: string | null;
-  bio?: string | null;
-  roastLevel: UserPreferenceRecord["roastLevel"];
-  responseLength: UserPreferenceRecord["responseLength"];
-  outputFormat: UserPreferenceRecord["outputFormat"];
-  answerMode: UserPreferenceRecord["answerMode"];
-  preferredModel: string;
-  onlyFromSources: boolean;
-  defaultFolderId: Types.ObjectId | null;
-  memoryNotes: string;
-  hideChatSettingsPanel: boolean;
-  subscriptionTier: BillingRecord["tier"];
-  subscriptionStatus: SubscriptionStatus;
-  subscriptionPlanName: string | null;
-  subscriptionAmountPaise: number | null;
-  subscriptionCurrency: string | null;
-  razorpayCustomerId: string | null;
-  razorpayPlanId: string | null;
-  razorpaySubscriptionId: string | null;
-  razorpaySubscriptionShortUrl: string | null;
-  subscriptionCurrentStart: Date | null;
-  subscriptionCurrentEnd: Date | null;
-  subscriptionChargeAt: Date | null;
-  subscriptionCancelAtCycleEnd: boolean;
-  subscriptionLastPaymentId: string | null;
-  subscriptionFailureReason: string | null;
-  subscriptionLastWebhookEventId: string | null;
-  subscriptionLastWebhookAt: Date | null;
-  premiumActivatedAt: Date | null;
-};
-
-type ChatDocument = {
-  _id: Types.ObjectId;
-  clerkUserId: string;
-  folderId: Types.ObjectId | null;
-  title: string;
-  messages: MessageDocument[];
-  lastMessageAt: Date;
-  isPinned: boolean;
-  isArchived: boolean;
-  isDeleted: boolean;
-  deletedAt: Date | null;
-  restoreUntil: Date | null;
-  branchFromChatId: Types.ObjectId | null;
-  branchFromMessageId: Types.ObjectId | null;
-  systemPrompt: string;
-  useWebSearch: boolean;
-  answerMode: UserPreferenceRecord["answerMode"];
-  preferredModel: string;
-  responseLength: UserPreferenceRecord["responseLength"];
-  outputFormat: UserPreferenceRecord["outputFormat"];
-  roastLevel: UserPreferenceRecord["roastLevel"];
-  onlyFromSources: boolean;
-  contextWindow: number;
-  summary: string;
-  createdAt: Date;
-  updatedAt: Date;
-};
-
-type ActivityDocument = {
-  _id: Types.ObjectId;
-  clerkUserId: string;
-  type: string;
-  entityType: "chat" | "folder" | "message" | "workspace";
-  entityId: string | null;
-  metadata: Record<string, unknown>;
-  createdAt: Date;
-  updatedAt: Date;
-};
-
-type BillingWebhookEventDocument = {
-  _id: Types.ObjectId;
-  eventId: string;
-  eventType: string;
-  razorpaySubscriptionId: string | null;
-  clerkUserId: string | null;
-  createdAt: Date;
-  updatedAt: Date;
-};
-
-const sourceSchema = new Schema(
-  {
-    url: { type: String, required: true },
-    title: { type: String, required: true },
-    content: { type: String, required: true },
-  },
-  { _id: false }
-);
-
-const messageSchema = new Schema(
-  {
-    role: { type: String, enum: ["user", "assistant"], required: true },
-    content: { type: String, required: true },
-    sources: { type: [sourceSchema], default: undefined },
-    followUps: { type: [String], default: undefined },
-    contextUsed: { type: [String], default: undefined },
-    confidence: { type: Number, default: undefined },
-    webSearchUsed: { type: Boolean, default: undefined },
-    editedAt: { type: Date, default: null },
-    createdAt: { type: Date, default: Date.now },
-  },
-  { _id: true }
-);
-
-const appUserSchema = new Schema(
-  {
-    clerkUserId: { type: String, required: true, unique: true, index: true },
-    email: { type: String, default: null },
-    displayName: { type: String, required: true },
-    customDisplayName: { type: String, default: null },
-    firstName: { type: String, default: null },
-    lastName: { type: String, default: null },
-    username: { type: String, default: null },
-    publicUsername: { type: String, default: null, unique: true, sparse: true, index: true },
-    imageUrl: { type: String, default: null },
-    customImageUrl: { type: String, default: null },
-    bio: { type: String, default: null },
-    roastLevel: { type: String, enum: ["light", "medium", "high"], default: "medium" },
-    responseLength: { type: String, enum: ["short", "medium", "long"], default: "short" },
-    outputFormat: { type: String, enum: ["bullets", "paragraphs"], default: "bullets" },
-    answerMode: { type: String, enum: ["fast", "balanced", "deep"], default: "fast" },
-    preferredModel: { type: String, default: "llama-3.1-8b-instant" },
-    onlyFromSources: { type: Boolean, default: false },
-    defaultFolderId: { type: Schema.Types.ObjectId, ref: "ChatFolder", default: null },
-    memoryNotes: { type: String, default: "" },
-    hideChatSettingsPanel: { type: Boolean, default: false },
-    subscriptionTier: { type: String, enum: ["free", "premium"], default: "free" },
-    subscriptionStatus: { type: String, default: "inactive", index: true },
-    subscriptionPlanName: { type: String, default: null },
-    subscriptionAmountPaise: { type: Number, default: null },
-    subscriptionCurrency: { type: String, default: null },
-    razorpayCustomerId: { type: String, default: null },
-    razorpayPlanId: { type: String, default: null },
-    razorpaySubscriptionId: { type: String, default: null, index: true },
-    razorpaySubscriptionShortUrl: { type: String, default: null },
-    subscriptionCurrentStart: { type: Date, default: null },
-    subscriptionCurrentEnd: { type: Date, default: null },
-    subscriptionChargeAt: { type: Date, default: null },
-    subscriptionCancelAtCycleEnd: { type: Boolean, default: false },
-    subscriptionLastPaymentId: { type: String, default: null },
-    subscriptionFailureReason: { type: String, default: null },
-    subscriptionLastWebhookEventId: { type: String, default: null },
-    subscriptionLastWebhookAt: { type: Date, default: null },
-    premiumActivatedAt: { type: Date, default: null },
-    lastSignInAt: { type: Date, default: null },
-    lastSeenAt: { type: Date, default: Date.now },
-  },
-  { timestamps: true }
-);
-
-const folderSchema = new Schema(
-  {
-    clerkUserId: { type: String, required: true, index: true },
-    name: { type: String, required: true, trim: true },
-    parentFolderId: { type: Schema.Types.ObjectId, ref: "ChatFolder", default: null, index: true },
-    isFavorite: { type: Boolean, default: false },
-  },
-  { timestamps: true }
-);
-
-const chatSchema = new Schema(
-  {
-    clerkUserId: { type: String, required: true, index: true },
-    folderId: { type: Schema.Types.ObjectId, ref: "ChatFolder", default: null, index: true },
-    title: { type: String, required: true, trim: true },
-    messages: { type: [messageSchema], default: [] },
-    lastMessageAt: { type: Date, default: Date.now, index: true },
-    isPinned: { type: Boolean, default: false },
-    isArchived: { type: Boolean, default: false, index: true },
-    isDeleted: { type: Boolean, default: false, index: true },
-    deletedAt: { type: Date, default: null },
-    restoreUntil: { type: Date, default: null },
-    branchFromChatId: { type: Schema.Types.ObjectId, ref: "Chat", default: null },
-    branchFromMessageId: { type: Schema.Types.ObjectId, default: null },
-    systemPrompt: { type: String, default: "" },
-    useWebSearch: { type: Boolean, default: true },
-    answerMode: { type: String, enum: ["fast", "balanced", "deep"], default: "fast" },
-    preferredModel: { type: String, default: "llama-3.1-8b-instant" },
-    responseLength: { type: String, enum: ["short", "medium", "long"], default: "short" },
-    outputFormat: { type: String, enum: ["bullets", "paragraphs"], default: "bullets" },
-    roastLevel: { type: String, enum: ["light", "medium", "high"], default: "medium" },
-    onlyFromSources: { type: Boolean, default: false },
-    contextWindow: { type: Number, default: 12 },
-    summary: { type: String, default: "" },
-  },
-  { timestamps: true }
-);
-
-chatSchema.index({ clerkUserId: 1, isDeleted: 1, isArchived: 1, isPinned: -1, lastMessageAt: -1 });
-
-const activitySchema = new Schema(
-  {
-    clerkUserId: { type: String, required: true, index: true },
-    type: { type: String, required: true },
-    entityType: { type: String, enum: ["chat", "folder", "message", "workspace"], required: true },
-    entityId: { type: String, default: null },
-    metadata: { type: Schema.Types.Mixed, default: {} },
-  },
-  { timestamps: true }
-);
-
-const billingWebhookEventSchema = new Schema(
-  {
-    eventId: { type: String, required: true, unique: true, index: true },
-    eventType: { type: String, required: true },
-    razorpaySubscriptionId: { type: String, default: null, index: true },
-    clerkUserId: { type: String, default: null, index: true },
-  },
-  { timestamps: true }
-);
-
-const AppUser: mongoose.Model<any> =
-  (mongoose.models.AppUser as mongoose.Model<any> | undefined)
-  || mongoose.model("AppUser", appUserSchema);
-const ChatFolder: mongoose.Model<any> =
-  (mongoose.models.ChatFolder as mongoose.Model<any> | undefined)
-  || mongoose.model("ChatFolder", folderSchema);
-const Chat: mongoose.Model<any> =
-  (mongoose.models.Chat as mongoose.Model<any> | undefined)
-  || mongoose.model("Chat", chatSchema);
-const Activity: mongoose.Model<any> =
-  (mongoose.models.Activity as mongoose.Model<any> | undefined)
-  || mongoose.model("Activity", activitySchema);
-const BillingWebhookEvent: mongoose.Model<any> =
-  (mongoose.models.BillingWebhookEvent as mongoose.Model<any> | undefined)
-  || mongoose.model("BillingWebhookEvent", billingWebhookEventSchema);
 
 export type ChatMessageRecord = {
   id: string;
@@ -790,10 +464,6 @@ async function findChatOrThrow(clerkUserId: string, chatId: string) {
 
   if (!chat) throw new Error("Chat not found");
   return chat;
-}
-
-export async function ensureDatabase() {
-  await getMongoose();
 }
 
 export async function getDailyUserMessageCount(clerkUserId: string, date = new Date()) {
@@ -1742,11 +1412,13 @@ export async function getUsageDashboard(clerkUserId: string) {
     const key = new Date(item.createdAt).toISOString().slice(0, 10);
     const index = recentDayIndex.get(key);
     if (typeof index !== "number") continue;
-    recentDays[index].count += 1;
-    if (item.type === "message.user.created") recentDays[index].prompts += 1;
+    const day = recentDays[index];
+    if (!day) continue;
+    day.count += 1;
+    if (item.type === "message.user.created") day.prompts += 1;
     if (item.type === "message.assistant.created") {
-      recentDays[index].replies += 1;
-      if (item.metadata?.webSearchUsed) recentDays[index].searches += 1;
+      day.replies += 1;
+      if (item.metadata?.webSearchUsed) day.searches += 1;
     }
   }
 

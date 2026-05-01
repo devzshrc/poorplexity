@@ -1,6 +1,7 @@
 import Groq from "groq-sdk";
 import { BASE_SYSTEM_PROMPT, DEFAULT_MODEL, SUPPORTED_MODELS } from "../prompt";
 import type { SearchResult } from "./search";
+import { withRetry } from "./resilience";
 
 const groq = new Groq({ apiKey: process.env.GROQ_API_KEY });
 
@@ -115,28 +116,31 @@ export function buildPrompt(
 
 export async function* streamAnswer(prompt: string, options: AnswerOptions = {}): AsyncGenerator<string> {
   const model = sanitizeModel(options.preferredModel);
-  const stream = await groq.chat.completions.create({
-    model,
-    messages: [
-      {
-        role: "system",
-        content: [
-          BASE_SYSTEM_PROMPT,
-          formatInstruction(options.outputFormat ?? "bullets"),
-          structureInstruction(options.responseLength ?? "short"),
-          lengthInstruction(options.responseLength ?? "short"),
-          roastInstruction(options.roastLevel ?? "medium"),
-          modeInstruction(options.answerMode ?? "fast"),
-          options.onlyFromSources
-            ? "Never invent support that is not in the cited source set."
-            : "Reason carefully, but prefer grounded claims when sources are present.",
-        ].join("\n"),
-      },
-      { role: "user", content: prompt },
-    ],
-    temperature: options.answerMode === "deep" ? 0.4 : 0.7,
-    stream: true,
-  });
+  const stream = await withRetry(
+    () => groq.chat.completions.create({
+      model,
+      messages: [
+        {
+          role: "system",
+          content: [
+            BASE_SYSTEM_PROMPT,
+            formatInstruction(options.outputFormat ?? "bullets"),
+            structureInstruction(options.responseLength ?? "short"),
+            lengthInstruction(options.responseLength ?? "short"),
+            roastInstruction(options.roastLevel ?? "medium"),
+            modeInstruction(options.answerMode ?? "fast"),
+            options.onlyFromSources
+              ? "Never invent support that is not in the cited source set."
+              : "Reason carefully, but prefer grounded claims when sources are present.",
+          ].join("\n"),
+        },
+        { role: "user", content: prompt },
+      ],
+      temperature: options.answerMode === "deep" ? 0.4 : 0.7,
+      stream: true,
+    }),
+    { attempts: 2, baseDelayMs: 300 }
+  );
 
   for await (const chunk of stream) {
     const text = chunk.choices[0]?.delta?.content ?? "";
@@ -149,7 +153,7 @@ export async function getFollowUps(
   answer: string,
   history: ConversationTurn[] = []
 ): Promise<string[]> {
-  const res = await groq.chat.completions.create({
+  const res = await withRetry(() => groq.chat.completions.create({
     model: DEFAULT_MODEL,
     messages: [
       {
@@ -165,7 +169,7 @@ export async function getFollowUps(
       },
     ],
     stream: false,
-  });
+  }), { attempts: 2, baseDelayMs: 250 });
 
   const raw = (res.choices[0]?.message?.content ?? "").replace(/```json|```/g, "").trim();
   try {
@@ -185,7 +189,7 @@ export async function generateChatTitle(history: ConversationTurn[] = []): Promi
 
   if (!compactHistory) return null;
 
-  const res = await groq.chat.completions.create({
+  const res = await withRetry(() => groq.chat.completions.create({
     model: DEFAULT_MODEL,
     messages: [
       {
@@ -205,7 +209,7 @@ export async function generateChatTitle(history: ConversationTurn[] = []): Promi
     ],
     temperature: 0.2,
     stream: false,
-  });
+  }), { attempts: 2, baseDelayMs: 250 });
 
   const raw = (res.choices[0]?.message?.content ?? "").replace(/["`]/g, "").trim();
   if (!raw) return null;

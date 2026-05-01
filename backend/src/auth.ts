@@ -1,4 +1,5 @@
 import { createClerkClient } from "@clerk/backend";
+import { unauthorized } from "./errors";
 
 const ALLOWED_ORIGINS = (process.env.ALLOWED_ORIGINS ?? "http://localhost:5173")
   .split(",")
@@ -29,12 +30,12 @@ export async function authenticateRequest(request: Request): Promise<AuthContext
   });
 
   if (!requestState.isAuthenticated) {
-    throw new Error("Unauthorized");
+    throw unauthorized();
   }
 
   const auth = requestState.toAuth();
   if (!auth.userId) {
-    throw new Error("Unauthorized");
+    throw unauthorized();
   }
 
   return {
