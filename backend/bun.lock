@@ -10,6 +10,7 @@
         "@tavily/core": "^0.7.2",
         "groq-sdk": "^1.1.2",
         "mongoose": "^8.19.2",
+        "zod": "^4.1.12",
       },
       "devDependencies": {
         "@types/bun": "latest",
@@ -228,5 +229,7 @@
     "whatwg-url": ["whatwg-url@14.2.0", "", { "dependencies": { "tr46": "^5.1.0", "webidl-conversions": "^7.0.0" } }, "sha512-De72GdQZzNTUBBChsXueQUnPKDkg/5A5zp7pFDuQAj5UFoENpiACU0wlCvzpAGnTkj++ihpKwKyYewn/XNUbKw=="],
 
     "ws": ["ws@8.20.0", "", { "peerDependencies": { "bufferutil": "^4.0.1", "utf-8-validate": ">=5.0.2" }, "optionalPeers": ["bufferutil", "utf-8-validate"] }, "sha512-sAt8BhgNbzCtgGbt2OxmpuryO63ZoDk/sqaB/znQm94T4fCEsy/yV+7CdC1kJhOU9lboAEU7R3kquuycDoibVA=="],
+
+    "zod": ["zod@4.4.1", "", {}, "sha512-a6ENMBBGZBsnlSebQ/eKCguSBeGKSf4O7BPnqVPmYGtpBYI7VSqoVqw+QcB7kPRjbqPwhYTpFbVj/RqNz/CT0Q=="],
   }
 }

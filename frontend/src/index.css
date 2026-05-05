@@ -539,33 +539,79 @@ html.dark, .dark {
 }
 
 .premium-surface {
-  background: var(--card);
+  background: color-mix(in oklab, var(--card) 94%, var(--background));
   border: 1px solid var(--border);
   transition:
     background-color 140ms ease,
     border-color 140ms ease;
 }
 
+.surface-panel,
+.surface-raised,
+.surface-subtle,
+.surface-row,
+.surface-composer {
+  border: 1px solid color-mix(in oklab, var(--border) 88%, transparent);
+  transition:
+    background-color 140ms ease,
+    border-color 140ms ease,
+    box-shadow 180ms ease,
+    transform 180ms ease;
+}
+
+.surface-panel {
+  background: color-mix(in oklab, var(--card) 96%, var(--background));
+}
+
+.surface-raised {
+  background: color-mix(in oklab, var(--card) 96%, var(--foreground) 2%);
+  box-shadow: 0 18px 48px -40px color-mix(in oklab, var(--foreground) 32%, transparent);
+}
+
+.surface-subtle {
+  background: color-mix(in oklab, var(--background) 72%, var(--card));
+}
+
+.surface-row {
+  background: color-mix(in oklab, var(--background) 66%, var(--card));
+  border-radius: var(--radius);
+}
+
+.surface-row:hover {
+  background: color-mix(in oklab, var(--muted) 88%, var(--card));
+  border-color: color-mix(in oklab, var(--ring) 34%, var(--border));
+}
+
+.surface-composer {
+  background: color-mix(in oklab, var(--card) 92%, var(--background));
+  border-top: 1px solid color-mix(in oklab, var(--border) 88%, transparent);
+  border-right: 0;
+  border-bottom: 0;
+  border-left: 0;
+  box-shadow: 0 -16px 36px -34px color-mix(in oklab, var(--foreground) 28%, transparent);
+}
+
 .glass,
 .glass-strong,
 .glass-soft {
-  background: var(--card);
-  border: 1px solid var(--border);
+  background: color-mix(in oklab, var(--card) 92%, transparent);
+  border: 1px solid color-mix(in oklab, var(--border) 88%, transparent);
+  backdrop-filter: blur(14px);
   transition:
     background-color 140ms ease,
     border-color 140ms ease;
 }
 
 .glass {
-  background: var(--card);
+  background: color-mix(in oklab, var(--card) 90%, transparent);
 }
 
 .glass-strong {
-  background: var(--card);
+  background: color-mix(in oklab, var(--card) 96%, transparent);
 }
 
 .glass-soft {
-  background: var(--popover);
+  background: color-mix(in oklab, var(--popover) 94%, transparent);
 }
 
 .snappy-scroll {

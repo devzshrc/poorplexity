@@ -179,6 +179,7 @@ export function Workspace({
   const [isCancellingSubscription, setIsCancellingSubscription] = useState(false)
   const [showUpgradePrompt, setShowUpgradePrompt] = useState(false)
   const [showToolsMenu, setShowToolsMenu] = useState(false)
+  const [showCommandMenu, setShowCommandMenu] = useState(false)
   const [showSidebar, setShowSidebar] = useState(false)
   const [recentReplyFx, setRecentReplyFx] = useState<{ chatId: string; at: number } | null>(null)
   const [sourceLayout, setSourceLayout] = useState<SourceLayout>('answer-first')
@@ -391,6 +392,7 @@ export function Workspace({
       return trimmed ? `/${command} ${trimmed}` : `/${command} `
     })
     if (command === 'research') setComposerUseWebSearch(true)
+    setShowCommandMenu(false)
     composerRef.current?.focus()
   }
 
@@ -1941,7 +1943,7 @@ ${renderMarkdown(markdown)}
                 </div>
               </div>
 
-              <div className="glass mobile-composer sticky bottom-0 z-20 mt-auto border-t border-border px-5 py-4">
+              <div className="surface-composer mobile-composer sticky bottom-0 z-20 mt-auto px-5 py-4">
                 <div className="mx-auto w-full max-w-[1120px]">
                   <AnimatePresence>
                     {showUpgradePrompt ? (
@@ -1985,36 +1987,57 @@ ${renderMarkdown(markdown)}
                         else sendMessage().catch((error: Error) => setErrorMessage(error.message))
                       }
                     }}
-                    placeholder={editingMessageId ? 'Update that earlier message and resend.' : 'Ask a follow-up. ⌘K new chat · ⌘/ focus · ↑ edit last · Esc stop. Shift+Enter for a new line.'}
-                    className="min-h-[9rem] max-h-40 px-4 py-3"
+                    placeholder={editingMessageId ? 'Update that earlier message and resend.' : 'Ask a follow-up, compare sources, or branch the research.'}
+                    className="min-h-[8rem] max-h-40 px-4 py-3"
                   />
-                  <div className="mt-3 flex flex-wrap items-center gap-2">
-                    {COMPOSER_COMMANDS.map((command) => {
-                      const Icon = command.icon
-                      return (
-                        <Button
-                          key={command.id}
-                          type="button"
-                          variant="outline"
-                          size="sm"
-                          className="h-8"
-                          title={command.hint}
-                          onClick={() => applyCommandChip(command.id)}
-                        >
-                          <Icon className="mr-2 size-3.5" />
-                          {command.label}
-                        </Button>
-                      )
-                    })}
-                    <Badge variant="outline" className="h-8 px-3 text-[11px] sm:text-xs">
-                      {ANSWER_STYLE_OPTIONS.find((option) => option.id === currentAnswerStyle)?.label ?? 'Structured'} mode
-                    </Badge>
-                  </div>
                   <div className="mt-3 flex flex-col gap-2 sm:flex-row sm:flex-wrap sm:items-center sm:justify-between">
                     <div className="flex flex-col gap-2 text-[11px] text-muted-foreground sm:flex-row sm:flex-wrap sm:items-center sm:gap-3 sm:text-xs">
+                      <div className="relative">
+                        <Button
+                          type="button"
+                          variant={showCommandMenu ? 'secondary' : 'outline'}
+                          size="sm"
+                          className="h-8"
+                          title="Open writing commands"
+                          aria-expanded={showCommandMenu}
+                          onClick={() => setShowCommandMenu((current) => !current)}
+                        >
+                          <Sparkle className="mr-2 size-3.5" />
+                          Commands
+                        </Button>
+                        <AnimatePresence>
+                          {showCommandMenu ? (
+                            <motion.div
+                              {...fadeScale}
+                              className="glass-soft absolute bottom-full left-0 z-30 mb-2 w-[min(calc(100vw-2rem),22rem)] rounded-md border border-border p-1"
+                            >
+                              {COMPOSER_COMMANDS.map((command) => {
+                                const Icon = command.icon
+                                return (
+                                  <button
+                                    key={command.id}
+                                    type="button"
+                                    onClick={() => applyCommandChip(command.id)}
+                                    className="flex w-full items-start gap-3 rounded-md px-3 py-2 text-left transition-colors hover:bg-muted"
+                                  >
+                                    <Icon className="mt-0.5 size-4 shrink-0 text-muted-foreground" />
+                                    <span className="min-w-0">
+                                      <span className="block text-sm font-medium text-foreground">{command.label}</span>
+                                      <span className="mt-0.5 block text-xs leading-5 text-muted-foreground">{command.hint}</span>
+                                    </span>
+                                  </button>
+                                )
+                              })}
+                            </motion.div>
+                          ) : null}
+                        </AnimatePresence>
+                      </div>
+                      <Badge variant="outline" className="h-8 px-3 text-[11px] sm:text-xs">
+                        {ANSWER_STYLE_OPTIONS.find((option) => option.id === currentAnswerStyle)?.label ?? 'Structured'} mode
+                      </Badge>
                       <label className="flex items-center gap-2">
                         <Globe className="size-3.5" />
-                        <span>Web search for this message</span>
+                        <span>Web search</span>
                         <Switch checked={composerUseWebSearch} onCheckedChange={setComposerUseWebSearch} ariaLabel="Web search for this message" />
                       </label>
                       <span>
@@ -2061,7 +2084,7 @@ ${renderMarkdown(markdown)}
               <div className="max-w-md text-center">
                 <div className="mx-auto mb-4 flex size-12 items-center justify-center rounded-md bg-muted"><MessageSquare className="size-5" /></div>
                 <h3 className="text-xl font-semibold tracking-tight">Start something useful</h3>
-                <p className="mt-2 text-sm leading-6 text-muted-foreground">Create a chat, keep context, and stop losing threads to product entropy.</p>
+                <p className="mt-2 text-sm leading-6 text-muted-foreground">Create a research thread. Sources, branches, and reusable context will stay attached.</p>
                 <div className="mt-6">
                   <Button onClick={() => createNewChat().catch((error: Error) => setErrorMessage(error.message))}>
                     <Plus className="mr-2 size-4" />

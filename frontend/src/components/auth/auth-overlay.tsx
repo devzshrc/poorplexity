@@ -54,16 +54,16 @@ export function AuthOverlay({
       {isOpen ? (
         <motion.div
           {...fadeUp}
-          className="absolute inset-0 z-40 flex items-center justify-center bg-background/85 p-4"
+          className="absolute inset-0 z-40 flex items-center justify-center bg-background/85 p-4 backdrop-blur-sm"
         >
           <motion.div {...fadeUp} className="w-full max-w-sm">
-            <Card className="premium-surface w-full shadow-none">
+            <Card className="surface-raised w-full shadow-none">
               <CardHeader>
                 <div className="flex items-start justify-between gap-3">
                   <div>
                     <CardTitle className="text-lg">Continue with Google</CardTitle>
                     <CardDescription className="mt-1">
-                      Sign in to send, save, branch, export, and keep your workspace without leaving our UI first.
+                      Your draft will come with you. Sign in only when you want to save and keep working.
                     </CardDescription>
                   </div>
                   <Button variant="ghost" size="icon-sm" title="Close sign-in" onClick={onClose}>
@@ -72,8 +72,8 @@ export function AuthOverlay({
                 </div>
               </CardHeader>
               <CardContent className="space-y-4">
-                <div className="rounded-md border border-border bg-muted/60 px-4 py-3 text-sm text-muted-foreground">
-                  We only support Google sign-in right now, so the flow stays short and clean.
+                <div className="surface-subtle rounded-md px-4 py-3 text-sm text-muted-foreground">
+                  Google is the only sign-in method for now. After auth, you return to this workspace with the draft intact.
                 </div>
 
                 <Button className="h-11 w-full justify-center" disabled={isSubmitting} onClick={() => void continueWithGoogle()}>
@@ -89,11 +89,11 @@ export function AuthOverlay({
                 ) : null}
 
                 <p className="text-center text-xs text-muted-foreground">
-                  This sheet is ours. Clerk only handles the secure Google session once you continue.
+                  Clerk handles the secure Google session; poorplexity keeps the workspace state.
                 </p>
 
                 <Button variant="ghost" className="w-full justify-center" onClick={onClose}>
-                  Continue without signing in
+                  Keep previewing
                 </Button>
               </CardContent>
             </Card>
