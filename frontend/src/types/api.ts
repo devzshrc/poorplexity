@@ -1,5 +1,5 @@
 export type ThemeMode = 'light' | 'dark'
-export type RouteState = { kind: 'workspace' } | { kind: 'profile'; username: string }
+export type RouteState = { kind: 'workspace' } | { kind: 'profile'; username: string } | { kind: 'sso-callback' }
 
 export type PreferenceRecord = {
   roastLevel: 'light' | 'medium' | 'high'

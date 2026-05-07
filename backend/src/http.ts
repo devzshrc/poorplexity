@@ -1,9 +1,4 @@
-const ALLOWED_ORIGINS: string[] = (
-  process.env.ALLOWED_ORIGINS ?? "http://localhost:5173"
-)
-  .split(",")
-  .map((o) => o.trim().replace(/\/+$/, ""))
-  .filter(Boolean);
+import { ALLOWED_ORIGINS, normalizeOrigin } from "./config/origins";
 
 const DEFAULT_ALLOWED_HEADERS = [
   "Content-Type",
@@ -12,10 +7,6 @@ const DEFAULT_ALLOWED_HEADERS = [
   "Origin",
   "X-Requested-With",
 ];
-
-function normalizeOrigin(origin: string): string {
-  return origin.trim().replace(/\/+$/, "");
-}
 
 export function getRequestOrigin(req: Request): string | null {
   const origin = req.headers.get("Origin");

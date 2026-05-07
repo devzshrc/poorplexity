@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react'
-import { ClerkLoaded, ClerkLoading, useAuth } from '@clerk/react'
+import { AuthenticateWithRedirectCallback, ClerkLoaded, ClerkLoading, useAuth } from '@clerk/react'
 
 import { WorkspaceSkeleton } from '@/components/common/workspace-skeleton'
 import { PublicProfilePage } from '@/features/profile'
@@ -40,6 +40,15 @@ export default function App() {
 
   if (route.kind === 'profile') {
     return <PublicProfilePage username={route.username} theme={theme} onBack={navigateHome} onToggleTheme={toggleTheme} />
+  }
+
+  if (route.kind === 'sso-callback') {
+    return (
+      <>
+        <WorkspaceSkeleton />
+        <AuthenticateWithRedirectCallback signInFallbackRedirectUrl="/" signUpFallbackRedirectUrl="/" />
+      </>
+    )
   }
 
   if (!isLoaded) return <WorkspaceSkeleton />

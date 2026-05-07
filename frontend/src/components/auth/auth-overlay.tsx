@@ -18,7 +18,8 @@ export function AuthOverlay({
   const clerk = useClerk()
   const [isSubmitting, setIsSubmitting] = useState(false)
   const [authError, setAuthError] = useState('')
-  const redirectUrl = typeof window === 'undefined' ? '/' : window.location.href
+  const redirectUrl = typeof window === 'undefined' ? '/sso-callback' : `${window.location.origin}/sso-callback`
+  const redirectUrlComplete = typeof window === 'undefined' ? '/' : window.location.href
 
   useEffect(() => {
     if (!isOpen) {
@@ -36,11 +37,15 @@ export function AuthOverlay({
           strategy: 'oauth_google'
           redirectUrl: string
           redirectUrlComplete: string
+          continueSignIn?: boolean
+          continueSignUp?: boolean
         }) => Promise<unknown>
       }).authenticateWithRedirect({
         strategy: 'oauth_google',
         redirectUrl,
-        redirectUrlComplete: redirectUrl,
+        redirectUrlComplete,
+        continueSignIn: true,
+        continueSignUp: true,
       })
     } catch (error) {
       setAuthError(error instanceof Error ? error.message : 'Google sign-in failed.')

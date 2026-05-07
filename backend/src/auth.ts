@@ -1,10 +1,6 @@
 import { createClerkClient } from "@clerk/backend";
+import { ALLOWED_ORIGINS } from "./config/origins";
 import { unauthorized } from "./errors";
-
-const ALLOWED_ORIGINS = (process.env.ALLOWED_ORIGINS ?? "http://localhost:5173")
-  .split(",")
-  .map((value) => value.trim().replace(/\/+$/, ""))
-  .filter(Boolean);
 
 function requireEnv(name: string): string {
   const value = process.env[name]?.trim();
